@@ -91,17 +91,39 @@ export default async function handler(request) {
     
     let fileIdToDownload = null;
     let isImage = false;
+    
+    // Siapkan wadah untuk ukuran dinamis (proporsional)
+    let targetW = 2048;
+    let targetH = 2048;
 
     // Jika dikirim sebagai Foto biasa
     if (fotoMasuk) {
       const indexFoto = fotoMasuk.length > 1 ? 1 : 0;
       fileIdToDownload = fotoMasuk[indexFoto].file_id;
       isImage = true;
+      
+      // BACA UKURAN ASLI DARI TELEGRAM LALU KALIKAN 2
+      const origW = fotoMasuk[indexFoto].width || 1024;
+      const origH = fotoMasuk[indexFoto].height || 1024;
+      targetW = origW * 2;
+      targetH = origH * 2;
     } 
     // Jika dikirim lewat menu Berkas (Document) dan formatnya adalah gambar
     else if (dokumenMasuk && dokumenMasuk.mime_type && dokumenMasuk.mime_type.startsWith('image/')) {
       fileIdToDownload = dokumenMasuk.file_id;
       isImage = true;
+    }
+
+    // BATASI MAKSIMAL 2048 AGAR CLIPDROP TIDAK ERROR, TETAPI TETAP PROPORSIONAL
+    if (targetW > 2048 || targetH > 2048) {
+      const ratio = targetW / targetH;
+      if (targetW > targetH) {
+        targetW = 2048;
+        targetH = Math.round(2048 / ratio);
+      } else {
+        targetH = 2048;
+        targetW = Math.round(2048 * ratio);
+      }
     }
 
     if (!chatId || (pesanUser === "" && !isImage)) {
@@ -158,11 +180,11 @@ export default async function handler(request) {
 
       await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
-      // --- KITA KUNCI KEDUA PARAMETERNYA DI SINI ---
+      // --- MENGGUNAKAN ANGKA DINAMIS PROPORSIONAL ---
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
-      formData.append('target_width', '2048');  // Mengisi parameter lebar wajib
-      formData.append('target_height', '2048'); // Mengisi parameter tinggi wajib
+      formData.append('target_width', targetW.toString());  
+      formData.append('target_height', targetH.toString()); 
       // ----------------------------------------------
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
@@ -250,5 +272,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-                              }
-                                 
+      }
