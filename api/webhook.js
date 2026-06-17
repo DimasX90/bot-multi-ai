@@ -85,36 +85,36 @@ export default async function handler(request) {
     const pesanUser = messageData.text || messageData.caption || "";
     const pesanLowercase = pesanUser.toLowerCase().trim();
     
-    // --- PERBAIKAN: DETEKSI FOTO DAN DOKUMEN (BERKAS) ---
+    // --- DETEKSI FOTO ---
     const fotoMasuk = messageData.photo;
     const dokumenMasuk = messageData.document;
     
     let fileIdToDownload = null;
     let isImage = false;
     
-    // Siapkan wadah untuk ukuran dinamis (proporsional)
     let targetW = 2048;
     let targetH = 2048;
 
     // Jika dikirim sebagai Foto biasa
     if (fotoMasuk) {
-      const indexFoto = fotoMasuk.length > 1 ? 1 : 0;
+      // --- PERBAIKAN: SELALU AMBIL UKURAN FOTO PALING BESAR/HD ---
+      const indexFoto = fotoMasuk.length - 1; 
       fileIdToDownload = fotoMasuk[indexFoto].file_id;
       isImage = true;
       
-      // BACA UKURAN ASLI DARI TELEGRAM LALU KALIKAN 2
       const origW = fotoMasuk[indexFoto].width || 1024;
       const origH = fotoMasuk[indexFoto].height || 1024;
+      
       targetW = origW * 2;
       targetH = origH * 2;
     } 
-    // Jika dikirim lewat menu Berkas (Document) dan formatnya adalah gambar
+    // Jika dikirim lewat menu Berkas (Document)
     else if (dokumenMasuk && dokumenMasuk.mime_type && dokumenMasuk.mime_type.startsWith('image/')) {
       fileIdToDownload = dokumenMasuk.file_id;
       isImage = true;
     }
 
-    // BATASI MAKSIMAL 2048 AGAR CLIPDROP TIDAK ERROR, TETAPI TETAP PROPORSIONAL
+    // BATASI MAKSIMAL 2048 AGAR CLIPDROP TIDAK ERROR (TETAP PROPORSIONAL)
     if (targetW > 2048 || targetH > 2048) {
       const ratio = targetW / targetH;
       if (targetW > targetH) {
@@ -150,7 +150,7 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
-    // --- 3. PENGUNDUHAN GAMBAR (MENDUKUNG BERKAS & FOTO) ---
+    // --- 3. PENGUNDUHAN GAMBAR ---
     let imageBuffer = null;
     let base64Image = null;
     
@@ -174,18 +174,16 @@ export default async function handler(request) {
     // --- 4. EKSEKUSI AI ---
     if (aiPilihan === "edit") {
       if (!isImage || !imageBuffer) {
-        await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto atau berkas gambar untuk saya perbagus.");
+        await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
 
       await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
-      // --- MENGGUNAKAN ANGKA DINAMIS PROPORSIONAL ---
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
       formData.append('target_width', targetW.toString());  
       formData.append('target_height', targetH.toString()); 
-      // ----------------------------------------------
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
@@ -203,7 +201,7 @@ export default async function handler(request) {
       }
     }
       
-    // [Bagian Gemini, Groq, Poolside, Pexels tetap sama dan aman...]
+    // [Bagian Gemini, Groq, Poolside, Pexels]
     else if (aiPilihan === "gemini") {
       const pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis gambar ini dengan detail.";
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
@@ -272,4 +270,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-      }
+        }
