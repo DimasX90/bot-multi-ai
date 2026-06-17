@@ -128,8 +128,8 @@ export default async function handler(request) {
       await setRedis(`sesi_${chatId}`, "gemini");
     } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
       await setRedis(`sesi_${chatId}`, "groq");
-    } else if (pesanLowercase.includes("@meta")) {
-      await setRedis(`sesi_${chatId}`, "meta");
+    } else if (pesanLowercase.includes("@qwen")) {
+      await setRedis(`sesi_${chatId}`, "qwen");
     } else if (pesanLowercase.includes("@gambar")) {
       await setRedis(`sesi_${chatId}`, "gambar");
     } else if (pesanLowercase.includes("@edit")) {
@@ -255,42 +255,45 @@ export default async function handler(request) {
     }
 
     // [D] POOLSIDE DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
-    else if (aiPilihan === "meta") {
-      const pertanyaanClean = pesanUser.replace(/@meta/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ Llama 3.1 sedang memproses jawaban...");
+    else if (aiPilihan === "qwen") {
+      const pertanyaanClean = pesanUser.replace(/@qwen/gi, '').trim() || "Halo";
+      await kirimPesanTelegram(chatId, "⏳ Qwen Coder sedang memproses kode/jawaban...");
       
-      let riwayatMeta = await getRedis(`memori_meta_${chatId}`) || [];
-      riwayatMeta.push({ role: "user", content: pertanyaanClean });
-      if (riwayatMeta.length > 16) riwayatMeta = riwayatMeta.slice(-16);
+      let riwayatQwen = await getRedis(`memori_qwen_${chatId}`) || [];
+      riwayatQwen.push({ role: "user", content: pertanyaanClean });
+      if (riwayatQwen.length > 16) riwayatQwen = riwayatQwen.slice(-16);
 
-      const resMeta = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const resQwen = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
           'Authorization': `Bearer ${OPENROUTER_API_KEY}` 
         },
         body: JSON.stringify({ 
-          model: "meta-llama/llama-3.1-8b-instruct:free", 
-          messages: riwayatMeta 
+          model: "qwen/qwen3-coder:free", // 👈 Model Qwen Coder terpasang
+          messages: riwayatQwen 
         })
       });
       
-      const dataMeta = await resMeta.json();
-      let jawabanMeta = "";
+      const dataQwen = await resQwen.json();
+      let jawabanQwen = "";
 
       // 🔍 CEK ERROR DARI OPENROUTER
-      if (dataMeta.error) {
-        jawabanMeta = `⚠️ Error OpenRouter: ${dataMeta.error.message}`;
-        console.error("OpenRouter Error:", dataMeta.error);
+      if (dataQwen.error) {
+        jawabanQwen = `⚠️ Error OpenRouter: ${dataQwen.error.message}`;
+        console.error("OpenRouter Error:", dataQwen.error);
       } else {
-        jawabanMeta = dataMeta.choices?.[0]?.message?.content || "⚠️ Gagal memproses Llama (Data kosong).";
+        jawabanQwen = dataQwen.choices?.[0]?.message?.content || "⚠️ Gagal memproses Qwen (Data kosong).";
       }
       
-      if (!jawabanMeta.startsWith("⚠️")) {
-        riwayatMeta.push({ role: "assistant", content: jawabanMeta });
-        await setRedis(`memori_meta_${chatId}`, riwayatMeta);
+      if (!jawabanQwen.startsWith("⚠️")) {
+        riwayatQwen.push({ role: "assistant", content: jawabanQwen });
+        await setRedis(`memori_qwen_${chatId}`, riwayatQwen);
       }
-
+      
+      await kirimPesanTelegram(chatId, `[Qwen 3 Coder]:\n\n${jawabanQwen}`);
+    }
+      
     // [E] PEXELS (GAMBAR)
     else if (aiPilihan === "gambar") {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
