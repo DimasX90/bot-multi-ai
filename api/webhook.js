@@ -160,10 +160,9 @@ export default async function handler(request) {
 
       // --- PERBAIKAN CLIPDROP (AMAN UNTUK EDGE RUNTIME) ---
       const formData = new FormData();
-      // Menggunakan 'image_file' sesuai permintaan Clipdrop (bukan 'image')
-      // Kita menghapus parameter target resolusi karena Clipdrop akan otomatis melakukan Upscale 2x secara default. Ini mencegah error 'nan'
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
-
+      formData.append('target_width', '2048'); // Parameter wajib agar server Clipdrop tidak membaca 'nan'
+      
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
         headers: { 'x-api-key': CLIPDROP_API_KEY },
