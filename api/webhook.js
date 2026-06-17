@@ -128,8 +128,8 @@ export default async function handler(request) {
       await setRedis(`sesi_${chatId}`, "gemini");
     } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
       await setRedis(`sesi_${chatId}`, "groq");
-    } else if (pesanLowercase.includes("@qwen")) {
-      await setRedis(`sesi_${chatId}`, "qwen");
+    } else if (pesanLowercase.includes("@liquid")) {
+      await setRedis(`sesi_${chatId}`, "liquid");
     } else if (pesanLowercase.includes("@gambar")) {
       await setRedis(`sesi_${chatId}`, "gambar");
     } else if (pesanLowercase.includes("@edit")) {
@@ -255,43 +255,43 @@ export default async function handler(request) {
     }
 
     // [D] POOLSIDE DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
-    else if (aiPilihan === "qwen") {
-      const pertanyaanClean = pesanUser.replace(/@qwen/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ Qwen Coder sedang memproses kode/jawaban...");
+    else if (aiPilihan === "liquid") {
+      const pertanyaanClean = pesanUser.replace(/@liquid/gi, '').trim() || "Halo";
+      await kirimPesanTelegram(chatId, "⏳ Liquid AI sedang memproses jawaban...");
       
-      let riwayatQwen = await getRedis(`memori_qwen_${chatId}`) || [];
-      riwayatQwen.push({ role: "user", content: pertanyaanClean });
-      if (riwayatQwen.length > 16) riwayatQwen = riwayatQwen.slice(-16);
+      let riwayatLiquid = await getRedis(`memori_liquid_${chatId}`) || [];
+      riwayatLiquid.push({ role: "user", content: pertanyaanClean });
+      if (riwayatLiquid.length > 16) riwayatLiquid = riwayatLiquid.slice(-16);
 
-      const resQwen = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const resLiquid = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
           'Authorization': `Bearer ${OPENROUTER_API_KEY}` 
         },
         body: JSON.stringify({ 
-          model: "qwen/qwen3-coder:free", // 👈 Model Qwen Coder terpasang
-          messages: riwayatQwen 
+          model: "liquid/lfm-2.5-1.2b-instruct:free", // 👈 Model Liquid AI yang super cepat terpasang
+          messages: riwayatLiquid 
         })
       });
       
-      const dataQwen = await resQwen.json();
-      let jawabanQwen = "";
+      const dataLiquid = await resLiquid.json();
+      let jawabanLiquid = "";
 
       // 🔍 CEK ERROR DARI OPENROUTER
-      if (dataQwen.error) {
-        jawabanQwen = `⚠️ Error OpenRouter: ${dataQwen.error.message}`;
-        console.error("OpenRouter Error:", dataQwen.error);
+      if (dataLiquid.error) {
+        jawabanLiquid = `⚠️ Error OpenRouter: ${dataLiquid.error.message}`;
+        console.error("OpenRouter Error:", dataLiquid.error);
       } else {
-        jawabanQwen = dataQwen.choices?.[0]?.message?.content || "⚠️ Gagal memproses Qwen (Data kosong).";
+        jawabanLiquid = dataLiquid.choices?.[0]?.message?.content || "⚠️ Gagal memproses Liquid AI (Data kosong).";
       }
       
-      if (!jawabanQwen.startsWith("⚠️")) {
-        riwayatQwen.push({ role: "assistant", content: jawabanQwen });
-        await setRedis(`memori_qwen_${chatId}`, riwayatQwen);
+      if (!jawabanLiquid.startsWith("⚠️")) {
+        riwayatLiquid.push({ role: "assistant", content: jawabanLiquid });
+        await setRedis(`memori_liquid_${chatId}`, riwayatLiquid);
       }
       
-      await kirimPesanTelegram(chatId, `[Qwen 3 Coder]:\n\n${jawabanQwen}`);
+      await kirimPesanTelegram(chatId, `[Liquid 1.2B]:\n\n${jawabanLiquid}`);
     }
       
     // [E] PEXELS (GAMBAR)
