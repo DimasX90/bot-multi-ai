@@ -128,7 +128,14 @@ export default async function handler(request) {
       if (resFile.ok) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
         imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
-        base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+        
+        // CARA AMAN: Mencegah server crash saat memproses foto besar
+        let binary = '';
+        const bytes = new Uint8Array(imageBuffer);
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        base64Image = btoa(binary);
       }
     }
 
