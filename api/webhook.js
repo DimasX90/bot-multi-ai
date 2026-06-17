@@ -128,8 +128,8 @@ export default async function handler(request) {
       await setRedis(`sesi_${chatId}`, "gemini");
     } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
       await setRedis(`sesi_${chatId}`, "groq");
-    } else if (pesanLowercase.includes("@liquid")) {
-      await setRedis(`sesi_${chatId}`, "liquid");
+    } else if (pesanLowercase.includes("@super")) {
+      await setRedis(`sesi_${chatId}`, "super");
     } else if (pesanLowercase.includes("@gambar")) {
       await setRedis(`sesi_${chatId}`, "gambar");
     } else if (pesanLowercase.includes("@edit")) {
@@ -255,43 +255,43 @@ export default async function handler(request) {
     }
 
     // [D] POOLSIDE DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
-    else if (aiPilihan === "liquid") {
-      const pertanyaanClean = pesanUser.replace(/@liquid/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ Liquid AI sedang memproses jawaban...");
+    else if (aiPilihan === "super") {
+      const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
+      await kirimPesanTelegram(chatId, "⏳ Nemotron Super sedang merangkai jawaban...");
       
-      let riwayatLiquid = await getRedis(`memori_liquid_${chatId}`) || [];
-      riwayatLiquid.push({ role: "user", content: pertanyaanClean });
-      if (riwayatLiquid.length > 16) riwayatLiquid = riwayatLiquid.slice(-16);
+      let riwayatSuper = await getRedis(`memori_super_${chatId}`) || [];
+      riwayatSuper.push({ role: "user", content: pertanyaanClean });
+      if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
 
-      const resLiquid = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const resSuper = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
           'Authorization': `Bearer ${OPENROUTER_API_KEY}` 
         },
         body: JSON.stringify({ 
-          model: "liquid/lfm-2.5-1.2b-instruct:free", // 👈 Model Liquid AI yang super cepat terpasang
-          messages: riwayatLiquid 
+          model: "nvidia/nemotron-3-super-120b-a12b:free", // 👈 Model canggih NVIDIA terpasang
+          messages: riwayatSuper 
         })
       });
       
-      const dataLiquid = await resLiquid.json();
-      let jawabanLiquid = "";
+      const dataSuper = await resSuper.json();
+      let jawabanSuper = "";
 
       // 🔍 CEK ERROR DARI OPENROUTER
-      if (dataLiquid.error) {
-        jawabanLiquid = `⚠️ Error OpenRouter: ${dataLiquid.error.message}`;
-        console.error("OpenRouter Error:", dataLiquid.error);
+      if (dataSuper.error) {
+        jawabanSuper = `⚠️ Error OpenRouter: ${dataSuper.error.message}`;
+        console.error("OpenRouter Error:", dataSuper.error);
       } else {
-        jawabanLiquid = dataLiquid.choices?.[0]?.message?.content || "⚠️ Gagal memproses Liquid AI (Data kosong).";
+        jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Gagal memproses Nemotron Super (Data kosong).";
       }
       
-      if (!jawabanLiquid.startsWith("⚠️")) {
-        riwayatLiquid.push({ role: "assistant", content: jawabanLiquid });
-        await setRedis(`memori_liquid_${chatId}`, riwayatLiquid);
+      if (!jawabanSuper.startsWith("⚠️")) {
+        riwayatSuper.push({ role: "assistant", content: jawabanSuper });
+        await setRedis(`memori_super_${chatId}`, riwayatSuper);
       }
       
-      await kirimPesanTelegram(chatId, `[Liquid 1.2B]:\n\n${jawabanLiquid}`);
+      await kirimPesanTelegram(chatId, `[Nemotron Super]:\n\n${jawabanSuper}`);
     }
       
     // [E] PEXELS (GAMBAR)
