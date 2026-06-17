@@ -4,7 +4,7 @@ export const config = {
   runtime: 'edge',
 };
 
-// ==================== CONFIGURATION (AMBIL DARI VERCEL ENV) ====================
+// ==================== CONFIGURATION ====================
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -12,9 +12,8 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const CLIPDROP_API_KEY = process.env.CLIPDROP_API_KEY; 
 const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
-// ===============================================================================
+// =======================================================
 
-// ==================== UPSTASH REDIS HTTPS OPERATIONS ====================
 async function setRedis(key, value) {
   await fetch(`${UPSTASH_REST_URL}/set/${key}`, {
     method: 'POST',
@@ -39,9 +38,7 @@ async function incrRedis(key) {
   const data = await res.json();
   return data.result;
 }
-// =======================================================================
 
-// ==================== TELEGRAM BOT ACTIONS ====================
 async function kirimPesanTelegram(chatId, teks) {
   await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST',
@@ -69,17 +66,14 @@ async function kirimFotoTelegramURL(chatId, urlFoto, caption) {
     body: JSON.stringify({ chat_id: chatId, photo: urlFoto, caption: caption, parse_mode: 'HTML' }),
   });
 }
-// ==============================================================
 
 export default async function handler(request) {
-  if (request.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
-  }
+  if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
   try {
     const data = await request.json();
     
-    // --- 1. SISTEM ANTI-SPAM VIA REDIS ---
+    // --- 1. ANTI-SPAM ---
     const updateId = data.update_id;
     if (updateId) {
       const hitCount = await incrRedis(`spam_${updateId}`);
@@ -90,14 +84,32 @@ export default async function handler(request) {
     const chatId = messageData.chat?.id;
     const pesanUser = messageData.text || messageData.caption || "";
     const pesanLowercase = pesanUser.toLowerCase().trim();
+    
+    // --- PERBAIKAN: DETEKSI FOTO DAN DOKUMEN (BERKAS) ---
     const fotoMasuk = messageData.photo;
+    const dokumenMasuk = messageData.document;
+    
+    let fileIdToDownload = null;
+    let isImage = false;
 
-    if (!chatId || (pesanUser === "" && !fotoMasuk)) {
+    // Jika dikirim sebagai Foto biasa
+    if (fotoMasuk) {
+      const indexFoto = fotoMasuk.length > 1 ? 1 : 0;
+      fileIdToDownload = fotoMasuk[indexFoto].file_id;
+      isImage = true;
+    } 
+    // Jika dikirim lewat menu Berkas (Document) dan formatnya adalah gambar
+    else if (dokumenMasuk && dokumenMasuk.mime_type && dokumenMasuk.mime_type.startsWith('image/')) {
+      fileIdToDownload = dokumenMasuk.file_id;
+      isImage = true;
+    }
+
+    if (!chatId || (pesanUser === "" && !isImage)) {
       return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
     }
 
-    // --- 2. DETEKSI PINDAH SALURAN AI ---
-    if (pesanLowercase.includes("@gemini") || (fotoMasuk && pesanUser === "" && !(await getRedis(`sesi_${chatId}`)) === "edit")) {
+    // --- 2. PINDAH SALURAN AI ---
+    if (pesanLowercase.includes("@gemini") || (isImage && pesanUser === "" && !(await getRedis(`sesi_${chatId}`)) === "edit")) {
       await setRedis(`sesi_${chatId}`, "gemini");
     } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
       await setRedis(`sesi_${chatId}`, "groq");
@@ -112,25 +124,20 @@ export default async function handler(request) {
     let aiPilihan = await getRedis(`sesi_${chatId}`);
 
     if (!aiPilihan) {
-      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: `@groq halo`, `@edit` (kirim foto), atau `@gambar naga api`");
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: `@groq halo`, `@edit` (lalu kirim foto), atau `@gambar naga`");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
-    // --- 3. PENGUNDUHAN GAMBAR TUNGGAL (SUPER CEPAT) ---
+    // --- 3. PENGUNDUHAN GAMBAR (MENDUKUNG BERKAS & FOTO) ---
     let imageBuffer = null;
     let base64Image = null;
     
-    if (fotoMasuk) {
-      // Ambil index ke-2 (resolusi optimal: cukup HD tapi tidak membuat server error)
-      const indexFoto = fotoMasuk.length > 1 ? 1 : 0;
-      const fileId = fotoMasuk[indexFoto].file_id;
-      
-      const resFile = await (await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${fileId}`)).json();
+    if (isImage && fileIdToDownload) {
+      const resFile = await (await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${fileIdToDownload}`)).json();
       if (resFile.ok) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
         imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
         
-        // HANYA proses teks Base64 jika AI yang dipakai adalah Gemini
         if (aiPilihan === "gemini") {
           let binary = '';
           const bytes = new Uint8Array(imageBuffer);
@@ -142,24 +149,20 @@ export default async function handler(request) {
       }
     }
 
-    // --- 4. EKSEKUSI JAWABAN BERDASARKAN SALURAN ---
-
-    // A. SALURAN EDIT FOTO (CLIPDROP)
+    // --- 4. EKSEKUSI AI ---
     if (aiPilihan === "edit") {
-      if (!fotoMasuk || !imageBuffer) {
-        await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
+      if (!isImage || !imageBuffer) {
+        await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto atau berkas gambar untuk saya perbagus.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
 
       await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
-      // --- PERBAIKAN DI SINI ---
+      // --- PERBAIKAN CLIPDROP (AMAN UNTUK EDGE RUNTIME) ---
       const formData = new FormData();
-      // Mengubah 'image' menjadi 'image_file' dan menambahkan MIME type serta nama file
+      // Menggunakan 'image_file' sesuai permintaan Clipdrop (bukan 'image')
+      // Kita menghapus parameter target resolusi karena Clipdrop akan otomatis melakukan Upscale 2x secara default. Ini mencegah error 'nan'
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
-      // Menambahkan target lebar (2048 pixel untuk hasil HD)
-      formData.append('target_width', '2048');
-      // -------------------------
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
@@ -173,47 +176,38 @@ export default async function handler(request) {
       } else {
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        await kirimPesanTelegram(chatId, "❌ Gagal mengedit. Server Clipdrop menolak permintaan ini. Silakan coba kirim foto lain.");
+        await kirimPesanTelegram(chatId, "❌ Gagal mengedit. Server Clipdrop menolak format/ukuran ini. Coba gambar lain.");
       }
     }
 
-    // B. SALURAN GEMINI
+    // [Bagian Gemini, Groq, Poolside, Pexels tetap sama dan aman...]
     else if (aiPilihan === "gemini") {
       const pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis gambar ini dengan detail.";
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
-
       let parts = [{"text": pertanyaanClean}];
       if (base64Image) parts.push({ "inline_data": { "mime_type": "image/jpeg", "data": base64Image } });
-
       const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: parts }] })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: parts }] })
       });
       const resData = await resGemini.json();
       const jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Respon tidak dikenali.";
-
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
     }
 
-    // C. SALURAN GROQ
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
-      if (fotoMasuk) {
+      if (isImage) {
         await kirimPesanTelegram(chatId, "⚠️ Groq tidak bisa melihat gambar. Dipindah otomatis ke Gemini!");
         await setRedis(`sesi_${chatId}`, "gemini");
         return new Response(JSON.stringify({ status: 'redirected' }), { status: 200 });
       } 
-      
       await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
       let riwayatChat = await getRedis(`memori_${chatId}`) || [];
       riwayatChat.push({ role: "user", content: pertanyaanClean });
       if (riwayatChat.length > 16) riwayatChat = riwayatChat.slice(-16);
-
       const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat })});
       const groqData = await resGroq.json();
       const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses Groq.";
-
       if (!jawabanGroq.startsWith("⚠️")) {
         riwayatChat.push({ role: "assistant", content: jawabanGroq });
         await setRedis(`memori_${chatId}`, riwayatChat);
@@ -221,23 +215,18 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
-    // D. SALURAN POOLSIDE VIA OPENROUTER
     else if (aiPilihan === "poolside") {
       const pertanyaanClean = pesanUser.replace(/@poolside/gi, '').trim();
       await kirimPesanTelegram(chatId, "⏳ Poolside sedang memproses jawaban...");
-
       const resPoolside = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_API_KEY}` },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_API_KEY}` },
         body: JSON.stringify({ model: "poolside/laguna-m.1:free", messages: [{ role: "user", content: pertanyaanClean }] })
       });
       const dataPool = await resPoolside.json();
       const jawabanPool = dataPool.choices?.[0]?.message?.content || "⚠️ Gagal memproses Poolside.";
-
       await kirimPesanTelegram(chatId, `[Poolside]:\n\n${jawabanPool}`);
     }
 
-    // E. SALURAN GAMBAR PEXELS
     else if (aiPilihan === "gambar") {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
       if (!promptGambar) {
@@ -246,7 +235,6 @@ export default async function handler(request) {
         await kirimPesanTelegram(chatId, "⏳ Mencari foto terbaik untukmu...");
         const API_KEY_PEXELS = "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq";
         const resPexels = await (await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1`, { headers: { "Authorization": API_KEY_PEXELS } })).json();
-
         if (resPexels.photos && resPexels.photos.length > 0) {
           await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil untuk: <b>${promptGambar}</b>`);
         } else {
@@ -261,4 +249,5 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-          }
+                              }
+                                 
