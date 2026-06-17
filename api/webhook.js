@@ -169,7 +169,7 @@ export default async function handler(request) {
       } else {
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        await kirimPesanTelegram(chatId, "❌ Gagal mengedit foto. Coba kirim foto yang sedikit lebih kecil/berbeda.");
+        await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Error dari server: ${errorData.substring(0, 50)}`);
       }
     }
 
