@@ -153,9 +153,13 @@ export default async function handler(request) {
 
       await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
-      // Mengirim langsung buffer ke Clipdrop tanpa tambahan parameter target_width
+      // --- PERBAIKAN DI SINI ---
       const formData = new FormData();
-      formData.append('image', new Blob([imageBuffer]));
+      // Mengubah 'image' menjadi 'image_file' dan menambahkan MIME type serta nama file
+      formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
+      // Menambahkan target lebar (2048 pixel untuk hasil HD)
+      formData.append('target_width', '2048');
+      // -------------------------
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
@@ -169,7 +173,6 @@ export default async function handler(request) {
       } else {
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        // Menggunakan pesan error yang lebih ramah bagi pengguna
         await kirimPesanTelegram(chatId, "❌ Gagal mengedit. Server Clipdrop menolak permintaan ini. Silakan coba kirim foto lain.");
       }
     }
@@ -258,5 +261,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-                                               }
-    
+          }
