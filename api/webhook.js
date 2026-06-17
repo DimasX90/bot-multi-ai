@@ -158,11 +158,10 @@ export default async function handler(request) {
 
       await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
-      // --- PERBAIKAN CLIPDROP (AMAN UNTUK EDGE RUNTIME) ---
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
-      formData.append('target_width', '2048'); // Parameter wajib agar server Clipdrop tidak membaca 'nan'
-      
+      formData.append('target_width', '2048'); 
+
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
         headers: { 'x-api-key': CLIPDROP_API_KEY },
@@ -173,9 +172,10 @@ export default async function handler(request) {
         const enhancedImageBuffer = await resClipdrop.arrayBuffer();
         await kirimFotoBinaryTelegram(chatId, enhancedImageBuffer, "✨ Foto berhasil diperbagus menjadi HD!");
       } else {
+        // KITA UBAH BAGIAN INI: Agar bot mengirim pesan error aslinya ke Telegram!
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        await kirimPesanTelegram(chatId, "❌ Gagal mengedit. Server Clipdrop menolak format/ukuran ini. Coba gambar lain.");
+        await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Alasan dari Clipdrop:\n\n${errorData}`);
       }
     }
 
