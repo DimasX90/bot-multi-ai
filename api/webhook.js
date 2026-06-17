@@ -128,8 +128,8 @@ export default async function handler(request) {
       await setRedis(`sesi_${chatId}`, "gemini");
     } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
       await setRedis(`sesi_${chatId}`, "groq");
-    } else if (pesanLowercase.includes("@dolphin")) {
-      await setRedis(`sesi_${chatId}`, "dolphin");
+    } else if (pesanLowercase.includes("@meta")) {
+      await setRedis(`sesi_${chatId}`, "meta");
     } else if (pesanLowercase.includes("@gambar")) {
       await setRedis(`sesi_${chatId}`, "gambar");
     } else if (pesanLowercase.includes("@edit")) {
@@ -255,44 +255,41 @@ export default async function handler(request) {
     }
 
     // [D] POOLSIDE DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
-    else if (aiPilihan === "dolphin") {
-      const pertanyaanClean = pesanUser.replace(/@dolphin/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ Dolphin sedang memproses jawaban...");
+    else if (aiPilihan === "meta") {
+      const pertanyaanClean = pesanUser.replace(/@meta/gi, '').trim() || "Halo";
+      await kirimPesanTelegram(chatId, "⏳ Llama 3.1 sedang memproses jawaban...");
       
-      let riwayatDolphin = await getRedis(`memori_dolphin_${chatId}`) || [];
-      riwayatDolphin.push({ role: "user", content: pertanyaanClean });
-      if (riwayatDolphin.length > 16) riwayatDolphin = riwayatDolphin.slice(-16);
+      let riwayatMeta = await getRedis(`memori_meta_${chatId}`) || [];
+      riwayatMeta.push({ role: "user", content: pertanyaanClean });
+      if (riwayatMeta.length > 16) riwayatMeta = riwayatMeta.slice(-16);
 
-      const resDolphin = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const resMeta = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
           'Authorization': `Bearer ${OPENROUTER_API_KEY}` 
         },
         body: JSON.stringify({ 
-          model: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free", 
-          messages: riwayatDolphin 
+          model: "meta-llama/llama-3.1-8b-instruct:free", 
+          messages: riwayatMeta 
         })
       });
       
-      const dataDolphin = await resDolphin.json();
-      let jawabanDolphin = "";
+      const dataMeta = await resMeta.json();
+      let jawabanMeta = "";
 
       // 🔍 CEK ERROR DARI OPENROUTER
-      if (dataDolphin.error) {
-        jawabanDolphin = `⚠️ Error OpenRouter: ${dataDolphin.error.message}`;
-        console.error("OpenRouter Error:", dataDolphin.error);
+      if (dataMeta.error) {
+        jawabanMeta = `⚠️ Error OpenRouter: ${dataMeta.error.message}`;
+        console.error("OpenRouter Error:", dataMeta.error);
       } else {
-        jawabanDolphin = dataDolphin.choices?.[0]?.message?.content || "⚠️ Gagal memproses Dolphin (Data kosong).";
+        jawabanMeta = dataMeta.choices?.[0]?.message?.content || "⚠️ Gagal memproses Llama (Data kosong).";
       }
       
-      if (!jawabanDolphin.startsWith("⚠️")) {
-        riwayatDolphin.push({ role: "assistant", content: jawabanDolphin });
-        await setRedis(`memori_dolphin_${chatId}`, riwayatDolphin);
+      if (!jawabanMeta.startsWith("⚠️")) {
+        riwayatMeta.push({ role: "assistant", content: jawabanMeta });
+        await setRedis(`memori_meta_${chatId}`, riwayatMeta);
       }
-      
-      await kirimPesanTelegram(chatId, `[Dolphin]:\n\n${jawabanDolphin}`);
-    }
 
     // [E] PEXELS (GAMBAR)
     else if (aiPilihan === "gambar") {
