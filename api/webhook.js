@@ -91,30 +91,23 @@ export default async function handler(request) {
     
     let fileIdToDownload = null;
     let isImage = false;
-    
     let targetW = 2048;
     let targetH = 2048;
 
-    // Jika dikirim sebagai Foto biasa
     if (fotoMasuk) {
-      // --- PERBAIKAN: SELALU AMBIL UKURAN FOTO PALING BESAR/HD ---
       const indexFoto = fotoMasuk.length - 1; 
       fileIdToDownload = fotoMasuk[indexFoto].file_id;
       isImage = true;
-      
       const origW = fotoMasuk[indexFoto].width || 1024;
       const origH = fotoMasuk[indexFoto].height || 1024;
-      
       targetW = origW * 2;
       targetH = origH * 2;
     } 
-    // Jika dikirim lewat menu Berkas (Document)
     else if (dokumenMasuk && dokumenMasuk.mime_type && dokumenMasuk.mime_type.startsWith('image/')) {
       fileIdToDownload = dokumenMasuk.file_id;
       isImage = true;
     }
 
-    // BATASI MAKSIMAL 2048 AGAR CLIPDROP TIDAK ERROR (TETAP PROPORSIONAL)
     if (targetW > 2048 || targetH > 2048) {
       const ratio = targetW / targetH;
       if (targetW > targetH) {
@@ -172,6 +165,8 @@ export default async function handler(request) {
     }
 
     // --- 4. EKSEKUSI AI ---
+
+    // [A] CLIPDROP
     if (aiPilihan === "edit") {
       if (!isImage || !imageBuffer) {
         await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
@@ -201,20 +196,40 @@ export default async function handler(request) {
       }
     }
       
-    // [Bagian Gemini, Groq, Poolside, Pexels]
+    // [B] GEMINI DENGAN MEMORI (Limit 6: 3 Pesan, 3 Respon)
     else if (aiPilihan === "gemini") {
       const pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis gambar ini dengan detail.";
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
-      let parts = [{"text": pertanyaanClean}];
-      if (base64Image) parts.push({ "inline_data": { "mime_type": "image/jpeg", "data": base64Image } });
+      
+      let memoriMentah = await getRedis(`memori_gemini_${chatId}`) || [];
+      let formatGemini = memoriMentah.map(msg => ({
+          role: msg.role,
+          parts: [{ text: msg.content }]
+      }));
+
+      let partsSaatIni = [{ text: pertanyaanClean }];
+      if (base64Image) {
+          partsSaatIni.push({ "inline_data": { "mime_type": "image/jpeg", "data": base64Image } });
+      }
+      formatGemini.push({ role: "user", parts: partsSaatIni });
+
       const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: parts }] })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini })
       });
       const resData = await resGemini.json();
       const jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Respon tidak dikenali.";
+      
+      if (!jawaban.startsWith("⚠️")) {
+          memoriMentah.push({ role: "user", content: pertanyaanClean });
+          memoriMentah.push({ role: "model", content: jawaban });
+          if (memoriMentah.length > 6) memoriMentah = memoriMentah.slice(-6); 
+          await setRedis(`memori_gemini_${chatId}`, memoriMentah);
+      }
+
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
     }
 
+    // [C] GROQ DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
       if (isImage) {
@@ -223,12 +238,15 @@ export default async function handler(request) {
         return new Response(JSON.stringify({ status: 'redirected' }), { status: 200 });
       } 
       await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
+      
       let riwayatChat = await getRedis(`memori_${chatId}`) || [];
       riwayatChat.push({ role: "user", content: pertanyaanClean });
       if (riwayatChat.length > 16) riwayatChat = riwayatChat.slice(-16);
+      
       const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat })});
       const groqData = await resGroq.json();
       const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses Groq.";
+      
       if (!jawabanGroq.startsWith("⚠️")) {
         riwayatChat.push({ role: "assistant", content: jawabanGroq });
         await setRedis(`memori_${chatId}`, riwayatChat);
@@ -236,18 +254,31 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
+    // [D] POOLSIDE DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
     else if (aiPilihan === "poolside") {
       const pertanyaanClean = pesanUser.replace(/@poolside/gi, '').trim();
       await kirimPesanTelegram(chatId, "⏳ Poolside sedang memproses jawaban...");
+      
+      let riwayatPool = await getRedis(`memori_poolside_${chatId}`) || [];
+      riwayatPool.push({ role: "user", content: pertanyaanClean });
+      if (riwayatPool.length > 16) riwayatPool = riwayatPool.slice(-16);
+
       const resPoolside = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_API_KEY}` },
-        body: JSON.stringify({ model: "poolside/laguna-m.1:free", messages: [{ role: "user", content: pertanyaanClean }] })
+        body: JSON.stringify({ model: "poolside/laguna-m.1:free", messages: riwayatPool })
       });
       const dataPool = await resPoolside.json();
       const jawabanPool = dataPool.choices?.[0]?.message?.content || "⚠️ Gagal memproses Poolside.";
+      
+      if (!jawabanPool.startsWith("⚠️")) {
+        riwayatPool.push({ role: "assistant", content: jawabanPool });
+        await setRedis(`memori_poolside_${chatId}`, riwayatPool);
+      }
+      
       await kirimPesanTelegram(chatId, `[Poolside]:\n\n${jawabanPool}`);
     }
 
+    // [E] PEXELS (GAMBAR)
     else if (aiPilihan === "gambar") {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
       if (!promptGambar) {
@@ -270,4 +301,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-        }
+  }
