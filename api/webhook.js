@@ -160,7 +160,7 @@ export default async function handler(request) {
 
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
-      formData.append('target_width', '2048'); 
+      // Baris target_width SUDAH DIHAPUS DARI SINI
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
@@ -172,7 +172,6 @@ export default async function handler(request) {
         const enhancedImageBuffer = await resClipdrop.arrayBuffer();
         await kirimFotoBinaryTelegram(chatId, enhancedImageBuffer, "✨ Foto berhasil diperbagus menjadi HD!");
       } else {
-        // KITA UBAH BAGIAN INI: Agar bot mengirim pesan error aslinya ke Telegram!
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
         await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Alasan dari Clipdrop:\n\n${errorData}`);
