@@ -257,25 +257,33 @@ export default async function handler(request) {
     // [D] POOLSIDE DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
     else if (aiPilihan === "dolphin") {
       const pertanyaanClean = pesanUser.replace(/@dolphin/gi, '').trim();
-      await kirimPesanTelegram(chatId, "⏳ Poolside sedang memproses jawaban...");
+      await kirimPesanTelegram(chatId, "⏳ Dolphin sedang memproses jawaban...");
       
-      let riwayatPool = await getRedis(`memori_dolphin_${chatId}`) || [];
-      riwayatPool.push({ role: "user", content: pertanyaanClean });
-      if (riwayatPool.length > 16) riwayatPool = riwayatPool.slice(-16);
+      let riwayatDolphin = await getRedis(`memori_dolphin_${chatId}`) || [];
+      riwayatDolphin.push({ role: "user", content: pertanyaanClean });
+      if (riwayatDolphin.length > 16) riwayatDolphin = riwayatDolphin.slice(-16);
 
-      const resdolphin = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_API_KEY}` },
-        body: JSON.stringify({ model: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free", messages: riwayatPool })
+      const resDolphin = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: 'POST', 
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}` 
+        },
+        body: JSON.stringify({ 
+          model: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free", 
+          messages: riwayatDolphin 
+        })
       });
-      const dataPool = await resPoolside.json();
-      const jawabanPool = dataPool.choices?.[0]?.message?.content || "⚠️ Gagal memproses Poolside.";
       
-      if (!jawabanPool.startsWith("⚠️")) {
-        riwayatPool.push({ role: "assistant", content: jawabanPool });
-        await setRedis(`memori_dolphin_${chatId}`, riwayatPool);
+      const dataDolphin = await resDolphin.json();
+      const jawabanDolphin = dataDolphin.choices?.[0]?.message?.content || "⚠️ Gagal memproses Dolphin.";
+      
+      if (!jawabanDolphin.startsWith("⚠️")) {
+        riwayatDolphin.push({ role: "assistant", content: jawabanDolphin });
+        await setRedis(`memori_dolphin_${chatId}`, riwayatDolphin);
       }
       
-      await kirimPesanTelegram(chatId, `[dolphin]:\n\n${jawabanPool}`);
+      await kirimPesanTelegram(chatId, `[Dolphin]:\n\n${jawabanDolphin}`);
     }
 
     // [E] PEXELS (GAMBAR)
