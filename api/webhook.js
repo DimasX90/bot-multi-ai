@@ -158,9 +158,12 @@ export default async function handler(request) {
 
       await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
+      // --- KITA KUNCI KEDUA PARAMETERNYA DI SINI ---
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
-      // Baris target_width SUDAH DIHAPUS DARI SINI
+      formData.append('target_width', '2048');  // Mengisi parameter lebar wajib
+      formData.append('target_height', '2048'); // Mengisi parameter tinggi wajib
+      // ----------------------------------------------
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
@@ -177,7 +180,7 @@ export default async function handler(request) {
         await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Alasan dari Clipdrop:\n\n${errorData}`);
       }
     }
-
+      
     // [Bagian Gemini, Groq, Poolside, Pexels tetap sama dan aman...]
     else if (aiPilihan === "gemini") {
       const pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis gambar ini dengan detail.";
