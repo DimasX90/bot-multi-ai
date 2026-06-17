@@ -122,7 +122,7 @@ export default async function handler(request) {
     
     if (fotoMasuk) {
       // Ambil index ke-2 (resolusi optimal: cukup HD tapi tidak membuat server error)
-      const indexFoto = fotoMasuk.length > 2 ? 2 : (fotoMasuk.length - 1);
+      const indexFoto = fotoMasuk.length > 1 ? 1 : 0;
       const fileId = fotoMasuk[indexFoto].file_id;
       
       const resFile = await (await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${fileId}`)).json();
