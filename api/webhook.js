@@ -50,7 +50,6 @@ async function kirimPesanTelegram(chatId, teks) {
   });
 }
 
-// Fungsi kirim foto menggunakan FormData (wajib untuk mengirim file binary asli/Buffer)
 async function kirimFotoBinaryTelegram(chatId, imageBuffer, caption) {
   const formData = new FormData();
   formData.append('chat_id', chatId);
@@ -80,13 +79,11 @@ export default async function handler(request) {
   try {
     const data = await request.json();
     
-    // --- 1. SISTEM ANTI-SPAM (CIRCUIT BREAKER) VIA REDIS ---
+    // --- 1. SISTEM ANTI-SPAM VIA REDIS ---
     const updateId = data.update_id;
     if (updateId) {
       const hitCount = await incrRedis(`spam_${updateId}`);
-      if (hitCount > 3) {
-        return new Response(JSON.stringify({ status: 'terblokir' }), { status: 200 });
-      }
+      if (hitCount > 3) return new Response(JSON.stringify({ status: 'terblokir' }), { status: 200 });
     }
 
     const messageData = data.message || {};
@@ -119,78 +116,64 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
-    // Unduh gambar dari Telegram langsung ke memori Buffer jika ada foto masuk
+    // --- 3. PENGUNDUHAN GAMBAR TUNGGAL (SUPER CEPAT) ---
     let imageBuffer = null;
     let base64Image = null;
+    
     if (fotoMasuk) {
-      const fileId = fotoMasuk[fotoMasuk.length - 1].file_id;
+      // Ambil index ke-2 (resolusi optimal: cukup HD tapi tidak membuat server error)
+      const indexFoto = fotoMasuk.length > 2 ? 2 : (fotoMasuk.length - 1);
+      const fileId = fotoMasuk[indexFoto].file_id;
+      
       const resFile = await (await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${fileId}`)).json();
       if (resFile.ok) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
         imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
         
-        // CARA AMAN: Mencegah server crash saat memproses foto besar
-        let binary = '';
-        const bytes = new Uint8Array(imageBuffer);
-        for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
+        // HANYA proses teks Base64 jika AI yang dipakai adalah Gemini
+        if (aiPilihan === "gemini") {
+          let binary = '';
+          const bytes = new Uint8Array(imageBuffer);
+          for (let i = 0; i < bytes.byteLength; i++) {
+              binary += String.fromCharCode(bytes[i]);
+          }
+          base64Image = btoa(binary);
         }
-        base64Image = btoa(binary);
       }
     }
 
-    // --- 3. EKSEKUSI JAWABAN BERDASARKAN SALURAN ---
+    // --- 4. EKSEKUSI JAWABAN BERDASARKAN SALURAN ---
 
-    // BARU: SALURAN EDIT FOTO (AI IMAGE ENHANCER - ANTI TIMEOUT)
-    else if (aiPilihan === "edit") {
-      if (!fotoMasuk) {
+    // A. SALURAN EDIT FOTO (CLIPDROP)
+    if (aiPilihan === "edit") {
+      if (!fotoMasuk || !imageBuffer) {
         await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
 
       await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
-      // 1. UNDUH FOTO DARI TELEGRAM (AMBIL RESOLUSI MENENGAH AGAR AMAN)
-      let imageBuffer = null;
-      // Telegram mengirim array foto dari ukuran kecil ke besar.
-      // Kita ambil index 1 (menengah) atau 0 (kecil) agar tidak ditolak Clipdrop
-      const indexFoto = fotoMasuk.length > 1 ? 1 : 0; 
-      const fileId = fotoMasuk[indexFoto].file_id;
-      
-      const resFile = await (await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/getFile?file_id=${fileId}`)).json();
-      
-      if (resFile.ok) {
-        const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${resFile.result.file_path}`;
-        imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
-      } else {
-        await kirimPesanTelegram(chatId, "❌ Gagal mengunduh foto dari Telegram.");
-        return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
-      }
-
-      // 2. MENGIRIM KE CLIPDROP UNTUK DI-UPSCALE
+      // Langsung lemparkan Buffer gambar ke Clipdrop
       const formData = new FormData();
       formData.append('image', new Blob([imageBuffer]));
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
-        headers: { 
-          'x-api-key': process.env.CLIPDROP_API_KEY 
-        },
+        headers: { 'x-api-key': CLIPDROP_API_KEY },
         body: formData
       });
 
-      // 3. MENERIMA DAN MENGIRIM HASILNYA
       if (resClipdrop.ok) {
         const enhancedImageBuffer = await resClipdrop.arrayBuffer();
         await kirimFotoBinaryTelegram(chatId, enhancedImageBuffer, "✨ Foto berhasil diperbagus menjadi HD!");
       } else {
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        await kirimPesanTelegram(chatId, "❌ Gagal mengedit foto. Meskipun ukurannya sudah dikecilkan, server Clipdrop sedang menolak.");
+        await kirimPesanTelegram(chatId, "❌ Gagal mengedit foto. Coba kirim foto yang sedikit lebih kecil/berbeda.");
       }
     }
 
-    // A. SALURAN GEMINI
+    // B. SALURAN GEMINI
     else if (aiPilihan === "gemini") {
       const pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis gambar ini dengan detail.";
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
@@ -209,37 +192,32 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
     }
 
-    // B. SALURAN GROQ
+    // C. SALURAN GROQ
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
       if (fotoMasuk) {
         await kirimPesanTelegram(chatId, "⚠️ Groq tidak bisa melihat gambar. Dipindah otomatis ke Gemini!");
         await setRedis(`sesi_${chatId}`, "gemini");
-        // Redirect logic ke Gemini
-        let parts = [{"text": pertanyaanClean || "Tolong analisis gambar ini dengan detail."}];
-        if (base64Image) parts.push({ "inline_data": { "mime_type": "image/jpeg", "data": base64Image } });
-        const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: parts }] })});
-        const resData = await resGemini.json();
-        await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${resData.candidates?.[0]?.content?.parts?.[0]?.text}`);
-      } else {
-        await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
-        let riwayatChat = await getRedis(`memori_${chatId}`) || [];
-        riwayatChat.push({ role: "user", content: pertanyaanClean });
-        if (riwayatChat.length > 16) riwayatChat = riwayatChat.slice(-16);
+        return new Response(JSON.stringify({ status: 'redirected' }), { status: 200 });
+      } 
+      
+      await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
+      let riwayatChat = await getRedis(`memori_${chatId}`) || [];
+      riwayatChat.push({ role: "user", content: pertanyaanClean });
+      if (riwayatChat.length > 16) riwayatChat = riwayatChat.slice(-16);
 
-        const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat })});
-        const groqData = await resGroq.json();
-        const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses Groq.";
+      const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat })});
+      const groqData = await resGroq.json();
+      const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses Groq.";
 
-        if (!jawabanGroq.startsWith("⚠️")) {
-          riwayatChat.push({ role: "assistant", content: jawabanGroq });
-          await setRedis(`memori_${chatId}`, riwayatChat);
-        }
-        await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
+      if (!jawabanGroq.startsWith("⚠️")) {
+        riwayatChat.push({ role: "assistant", content: jawabanGroq });
+        await setRedis(`memori_${chatId}`, riwayatChat);
       }
+      await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
-    // C. SALURAN POOLSIDE VIA OPENROUTER
+    // D. SALURAN POOLSIDE VIA OPENROUTER
     else if (aiPilihan === "poolside") {
       const pertanyaanClean = pesanUser.replace(/@poolside/gi, '').trim();
       await kirimPesanTelegram(chatId, "⏳ Poolside sedang memproses jawaban...");
@@ -255,7 +233,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Poolside]:\n\n${jawabanPool}`);
     }
 
-    // D. SALURAN GAMBAR PEXELS
+    // E. SALURAN GAMBAR PEXELS
     else if (aiPilihan === "gambar") {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
       if (!promptGambar) {
@@ -279,5 +257,5 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-                          }
-        
+                                               }
+    
