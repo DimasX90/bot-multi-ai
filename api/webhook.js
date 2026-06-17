@@ -142,30 +142,51 @@ export default async function handler(request) {
     // --- 3. EKSEKUSI JAWABAN BERDASARKAN SALURAN ---
 
     // BARU: SALURAN EDIT FOTO (AI IMAGE ENHANCER - ANTI TIMEOUT)
-    if (aiPilihan === "edit") {
+    else if (aiPilihan === "edit") {
       if (!fotoMasuk) {
-        await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Silakan kirimkan foto yang ingin kamu perbagus kualitasnya.");
+        await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
 
-      await kirimPesanTelegram(chatId, "⏳ AI sedang memproses dan memperbagus fotomu secara instan...");
+      await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
-      // Kirim file gambar ke API Clipdrop (Fitur: Super Resolution / Upscale)
-      const clipdropFormData = new FormData();
-      clipdropFormData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'input.jpg');
+      // 1. UNDUH FOTO DARI TELEGRAM (AMBIL RESOLUSI MENENGAH AGAR AMAN)
+      let imageBuffer = null;
+      // Telegram mengirim array foto dari ukuran kecil ke besar.
+      // Kita ambil index 1 (menengah) atau 0 (kecil) agar tidak ditolak Clipdrop
+      const indexFoto = fotoMasuk.length > 1 ? 1 : 0; 
+      const fileId = fotoMasuk[indexFoto].file_id;
+      
+      const resFile = await (await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/getFile?file_id=${fileId}`)).json();
+      
+      if (resFile.ok) {
+        const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_TOKEN}/${resFile.result.file_path}`;
+        imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
+      } else {
+        await kirimPesanTelegram(chatId, "❌ Gagal mengunduh foto dari Telegram.");
+        return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+      }
 
-      const resClipdrop = await fetch('https://clipdrop-api.co/super-resolution/v1', {
+      // 2. MENGIRIM KE CLIPDROP UNTUK DI-UPSCALE
+      const formData = new FormData();
+      formData.append('image', new Blob([imageBuffer]));
+
+      const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
-        headers: { 'x-api-key': CLIPDROP_API_KEY },
-        body: clipdropFormData
+        headers: { 
+          'x-api-key': process.env.CLIPDROP_API_KEY 
+        },
+        body: formData
       });
 
+      // 3. MENERIMA DAN MENGIRIM HASILNYA
       if (resClipdrop.ok) {
         const enhancedImageBuffer = await resClipdrop.arrayBuffer();
-        // Kirim balik foto HD hasil editan AI ke Telegram user
-        await kirimFotoBinaryTelegram(chatId, enhancedImageBuffer, "✨ Foto kamu berhasil diperbagus menjadi HD oleh AI!");
+        await kirimFotoBinaryTelegram(chatId, enhancedImageBuffer, "✨ Foto berhasil diperbagus menjadi HD!");
       } else {
-        await kirimPesanTelegram(chatId, "❌ Gagal mengedit foto. Batas limit API gratis habis atau format tidak didukung.");
+        const errorData = await resClipdrop.text();
+        console.error("Error Clipdrop:", errorData); 
+        await kirimPesanTelegram(chatId, "❌ Gagal mengedit foto. Meskipun ukurannya sudah dikecilkan, server Clipdrop sedang menolak.");
       }
     }
 
