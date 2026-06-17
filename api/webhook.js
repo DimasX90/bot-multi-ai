@@ -256,7 +256,7 @@ export default async function handler(request) {
 
     // [D] POOLSIDE DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
     else if (aiPilihan === "dolphin") {
-      const pertanyaanClean = pesanUser.replace(/@dolphin/gi, '').trim();
+      const pertanyaanClean = pesanUser.replace(/@dolphin/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ Dolphin sedang memproses jawaban...");
       
       let riwayatDolphin = await getRedis(`memori_dolphin_${chatId}`) || [];
@@ -276,7 +276,15 @@ export default async function handler(request) {
       });
       
       const dataDolphin = await resDolphin.json();
-      const jawabanDolphin = dataDolphin.choices?.[0]?.message?.content || "⚠️ Gagal memproses Dolphin.";
+      let jawabanDolphin = "";
+
+      // 🔍 CEK ERROR DARI OPENROUTER
+      if (dataDolphin.error) {
+        jawabanDolphin = `⚠️ Error OpenRouter: ${dataDolphin.error.message}`;
+        console.error("OpenRouter Error:", dataDolphin.error);
+      } else {
+        jawabanDolphin = dataDolphin.choices?.[0]?.message?.content || "⚠️ Gagal memproses Dolphin (Data kosong).";
+      }
       
       if (!jawabanDolphin.startsWith("⚠️")) {
         riwayatDolphin.push({ role: "assistant", content: jawabanDolphin });
