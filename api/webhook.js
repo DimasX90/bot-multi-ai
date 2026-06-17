@@ -128,8 +128,8 @@ export default async function handler(request) {
       await setRedis(`sesi_${chatId}`, "gemini");
     } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
       await setRedis(`sesi_${chatId}`, "groq");
-    } else if (pesanLowercase.includes("@poolside")) {
-      await setRedis(`sesi_${chatId}`, "poolside");
+    } else if (pesanLowercase.includes("@dolphin")) {
+      await setRedis(`sesi_${chatId}`, "dolphin");
     } else if (pesanLowercase.includes("@gambar")) {
       await setRedis(`sesi_${chatId}`, "gambar");
     } else if (pesanLowercase.includes("@edit")) {
@@ -255,27 +255,27 @@ export default async function handler(request) {
     }
 
     // [D] POOLSIDE DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
-    else if (aiPilihan === "poolside") {
-      const pertanyaanClean = pesanUser.replace(/@poolside/gi, '').trim();
+    else if (aiPilihan === "dolphin") {
+      const pertanyaanClean = pesanUser.replace(/@dolphin/gi, '').trim();
       await kirimPesanTelegram(chatId, "⏳ Poolside sedang memproses jawaban...");
       
-      let riwayatPool = await getRedis(`memori_poolside_${chatId}`) || [];
+      let riwayatPool = await getRedis(`memori_dolphin_${chatId}`) || [];
       riwayatPool.push({ role: "user", content: pertanyaanClean });
       if (riwayatPool.length > 16) riwayatPool = riwayatPool.slice(-16);
 
-      const resPoolside = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const resdolphin = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENROUTER_API_KEY}` },
-        body: JSON.stringify({ model: "poolside/laguna-m.1:free", messages: riwayatPool })
+        body: JSON.stringify({ model: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free", messages: riwayatPool })
       });
       const dataPool = await resPoolside.json();
       const jawabanPool = dataPool.choices?.[0]?.message?.content || "⚠️ Gagal memproses Poolside.";
       
       if (!jawabanPool.startsWith("⚠️")) {
         riwayatPool.push({ role: "assistant", content: jawabanPool });
-        await setRedis(`memori_poolside_${chatId}`, riwayatPool);
+        await setRedis(`memori_dolphin_${chatId}`, riwayatPool);
       }
       
-      await kirimPesanTelegram(chatId, `[Poolside]:\n\n${jawabanPool}`);
+      await kirimPesanTelegram(chatId, `[dolphin]:\n\n${jawabanPool}`);
     }
 
     // [E] PEXELS (GAMBAR)
