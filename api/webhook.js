@@ -157,6 +157,9 @@ export default async function handler(request) {
       const formData = new FormData();
       formData.append('image', new Blob([imageBuffer]));
 
+      // TAMBAHKAN BARIS INI: Memberitahu Clipdrop target ukuran yang diinginkan
+      formData.append('target_width', '2048');
+
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
         headers: { 'x-api-key': CLIPDROP_API_KEY },
