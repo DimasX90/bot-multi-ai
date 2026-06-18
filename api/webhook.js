@@ -155,10 +155,30 @@ export default async function handler(request) {
 
       await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
+      // --- 1. MENGHITUNG UKURAN HD ---
+      let targetW = 2048; // Ukuran bawaan jika gagal deteksi
+      let targetH = 2048; 
+      
+      if (fotoMasuk && fotoMasuk.length > 0) {
+        // Ambil data resolusi asli foto dari Telegram
+        const indexFoto = fotoMasuk.length > 1 ? 1 : 0;
+        const fotoAsli = fotoMasuk[indexFoto];
+        
+        targetW = fotoAsli.width * 2; // Perbesar resolusi 2x lipat
+        targetH = fotoAsli.height * 2;
+        
+        // Clipdrop memiliki batas maksimal 4096 piksel, batasi agar tidak error
+        if (targetW > 4096) targetW = 4096;
+        if (targetH > 4096) targetH = 4096;
+      }
+
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
       
-      // PERHATIKAN: TIDAK ADA LAGI TARGET_WIDTH DI SINI
+      // --- 2. MENGIRIM UKURAN PASTI KE CLIPDROP ---
+      // Math.round memastikan angkanya bulat, tidak ada lagi error "NaN"
+      formData.append('target_width', Math.round(targetW).toString());
+      formData.append('target_height', Math.round(targetH).toString());
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
