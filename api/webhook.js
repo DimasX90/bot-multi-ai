@@ -246,10 +246,14 @@ export default async function handler(request) {
     // [D] NEMOTRON SUPER (NVIDIA RESMI) DENGAN MEMORI 
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ Nemotron Super sedang merangkai jawaban...");
+      
+      // 1. Beri tahu user bahwa AI yang baru sedang merespons
+      await kirimPesanTelegram(chatId, "⏳ DiffusionGemma (Super Cepat) sedang memproses...");
+      
       let riwayatSuper = await getRedis(`memori_super_${chatId}`) || [];
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
       if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
+
       const resSuper = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: 'POST', 
         headers: { 
@@ -258,18 +262,19 @@ export default async function handler(request) {
           'Accept': 'application/json'
         },
         body: JSON.stringify({ 
-          model: "nvidia/nemotron-3-super-120b-a12b", 
+          // 👈 INI DIA! Otaknya sudah diganti ke model baru dari screenshot-mu
+          model: "google/diffusiongemma-26b-a4b-it", 
           messages: riwayatSuper,
-          max_tokens: 1024,
+          max_tokens: 4096, // 👈 Disesuaikan dengan batas di screenshot NVIDIA
           temperature: 0.7,
           top_p: 1.00,
-          frequency_penalty: 0.00,
-          presence_penalty: 0.00,
           stream: false
         })
       });
+      
       const dataSuper = await resSuper.json();
       let jawabanSuper = "";
+
       if (!resSuper.ok) {
         jawabanSuper = `⚠️ Error NVIDIA API: ${JSON.stringify(dataSuper)}`;
         console.error("NVIDIA API Error:", dataSuper);
@@ -278,7 +283,9 @@ export default async function handler(request) {
         riwayatSuper.push({ role: "assistant", content: jawabanSuper });
         await setRedis(`memori_super_${chatId}`, riwayatSuper);
       }
-      await kirimPesanTelegram(chatId, `[Nemotron Super 120B]:\n\n${jawabanSuper}`);
+      
+      // 👈 Judul balasan diubah agar kamu tahu ini sudah pakai AI yang baru
+      await kirimPesanTelegram(chatId, `[DiffusionGemma 26B]:\n\n${jawabanSuper}`);
     }
 
     // [E] AI VISION NANO (NVIDIA RESMI) DENGAN MEMORI
