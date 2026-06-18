@@ -39,7 +39,7 @@ async function incrRedis(key) {
   return data.result;
 }
 
-// 👈 PERBAIKAN: Fungsi pengiriman pesan dengan Markdown & Fallback
+// 👈 PERBAIKAN: Fungsi pengiriman pesan dengan HTML (Anti-Error & Bisa Disalin)
 async function kirimPesanTelegram(chatId, teks) {
   // 1. Amankan karakter khusus agar tidak merusak format HTML Telegram
   let amanTeks = teks
@@ -212,7 +212,7 @@ export default async function handler(request) {
       formData.append('target_width', Math.round(targetW).toString());
       formData.append('target_height', Math.round(targetH).toString());
 
-      const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
+      const resClipdrop = await fetch('[https://clipdrop-api.co/image-upscaling/v1/upscale](https://clipdrop-api.co/image-upscaling/v1/upscale)', {
         method: 'POST',
         headers: { 'x-api-key': CLIPDROP_API_KEY },
         body: formData
@@ -265,7 +265,7 @@ export default async function handler(request) {
       let riwayatChat = await getRedis(`memori_${chatId}`) || [];
       riwayatChat.push({ role: "user", content: pertanyaanClean });
       if (riwayatChat.length > 16) riwayatChat = riwayatChat.slice(-16);
-      const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat })});
+      const resGroq = await fetch("[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat })});
       const groqData = await resGroq.json();
       const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses Groq.";
       if (!jawabanGroq.startsWith("⚠️")) {
@@ -284,7 +284,7 @@ export default async function handler(request) {
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
       if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
 
-      const resSuper = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      const resSuper = await fetch("[https://integrate.api.nvidia.com/v1/chat/completions](https://integrate.api.nvidia.com/v1/chat/completions)", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
@@ -326,7 +326,7 @@ export default async function handler(request) {
         }
         konten.push({ type: "text", text: pertanyaan });
 
-        const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        const res = await fetch("[https://integrate.api.nvidia.com/v1/chat/completions](https://integrate.api.nvidia.com/v1/chat/completions)", {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
         body: JSON.stringify({ 
@@ -370,5 +370,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-          }
-                        
+                                        }
