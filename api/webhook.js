@@ -151,16 +151,16 @@ export default async function handler(request) {
     // [A] CLIPDROP
     if (aiPilihan === "edit") {
       if (!isImage || !imageBuffer) {
-        await kirimPesanTelegram(chatId, "ðŸ“¸ Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
+        await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
 
-      await kirimPesanTelegram(chatId, "â³ AI sedang memproses fotomu...");
+      await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
-      formData.append('target_width', targetW.toString());  
-      formData.append('target_height', targetH.toString()); 
+      
+      // KEDUA BARIS TARGET WIDTH & HEIGHT YANG MEMBUAT ERROR SUDAH DIHAPUS
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
@@ -170,11 +170,11 @@ export default async function handler(request) {
 
       if (resClipdrop.ok) {
         const enhancedImageBuffer = await resClipdrop.arrayBuffer();
-        await kirimFotoBinaryTelegram(chatId, enhancedImageBuffer, "âœ¨ Foto berhasil diperbagus menjadi HD!");
+        await kirimFotoBinaryTelegram(chatId, enhancedImageBuffer, "✨ Foto berhasil diperbagus menjadi HD!");
       } else {
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        await kirimPesanTelegram(chatId, `âŒ Gagal mengedit. Alasan dari Clipdrop:\n\n${errorData}`);
+        await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Alasan dari Clipdrop:\n\n${errorData.substring(0, 50)}`);
       }
     }
       
