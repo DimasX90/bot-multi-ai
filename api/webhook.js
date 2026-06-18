@@ -41,9 +41,9 @@ async function incrRedis(key) {
 
 // 👈 PERBAIKAN HTML: Mengamankan tag <think> dan memunculkan tombol Salin
 async function kirimPesanTelegram(chatId, teks) {
-  // Cegah error Telegram jika teks AI terlalu panjang (Batas 4096 karakter)
+  // Cegah error Telegram jika teks AI terlalu panjang
   if (teks.length > 4000) {
-    teks = teks.substring(0, 4000) + "\n\n...[Teks dipotong karena batas Telegram]";
+    teks = teks.substring(0, 4000) + "\n\n...[Teks dipotong karena batas karakter Telegram]";
   }
 
   function konversiKeHTML(text) {
@@ -279,7 +279,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
-    // [D] NEMOTRON SUPER - BOM WAKTU DIHAPUS & THINKING DIAKTIFKAN KEMBALI
+    // [D] NEMOTRON SUPER - KODE SUDAH DIKUNCI DI 1024 AGAR TIDAK ERROR
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ DiffusionGemma sedang merangkai jawaban...");
@@ -299,11 +299,11 @@ export default async function handler(request) {
           body: JSON.stringify({ 
             model: "google/diffusiongemma-26b-a4b-it", 
             messages: riwayatSuper,
-            max_tokens: 1024, 
+            max_tokens: 1024, // 👈 ANGKA INI SUDAH DIKUNCI 1024
             temperature: 1.00,
             top_p: 0.95,
             stream: false,
-            chat_template_kwargs: { "enable_thinking": true } // 👈 THINKING KEMBALI AKTIF!
+            chat_template_kwargs: { "enable_thinking": true }
           })
         });
         
@@ -321,8 +321,7 @@ export default async function handler(request) {
         await kirimPesanTelegram(chatId, `[DiffusionGemma]:\n\n${jawabanSuper}`);
 
       } catch (err) {
-        // Jika server Vercel memotong koneksi karena lebih dari batas (25s)
-        await kirimPesanTelegram(chatId, "⚠️ Server AI NVIDIA membutuhkan waktu terlalu lama. Silakan coba lagi.");
+        await kirimPesanTelegram(chatId, "⚠️ Waktu habis / Gagal menyambung. API NVIDIA terlalu lama memproses.");
       }
     }
 
