@@ -39,34 +39,44 @@ async function incrRedis(key) {
   return data.result;
 }
 
-// 👈 FUNGSI UTAMA: Mengonversi pesan AI ke HTML Telegram agar muncul tombol "SALIN KODE" & Anti-Melebar
+// 👈 PERBAIKAN FINAL: Pemaksaan tombol Salin Kode agar selalu muncul & Sembunyikan <think>
 async function kirimPesanTelegram(chatId, teks) {
   function konversiKeHTML(text) {
     if (!text) return "";
     
-    // 1. Amankan karakter khusus dan tag <think> agar tidak memicu error HTML di Telegram
-    let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    
-    // 2. Format Blok Kodingan (Triple Backtick) dengan Toleransi Spasi/Garis Baru
-    // Ini yang secara otomatis memicu tombol "SALIN KODE" bawaan Telegram
-    html = html.replace(/```([a-zA-Z0-9_\-\+]*)\s*\n([\s\S]*?)```/g, function(match, lang, code) {
-      const classLanguage = lang ? ` class="language-${lang}"` : '';
-      return `<pre><code${classLanguage}>${code}</code></pre>`;
-    });
+    // 1. Sembunyikan teks <think> agar chat rapi
+    let teksBersih = text.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
+    if (teksBersih.trim() === "") teksBersih = text;
 
-    // 3. Antisipasi jika AI lupa memberikan triple backtick penutup di akhir chat
-    html = html.replace(/```([a-zA-Z0-9_\-\+]*)\s*\n([\s\S]*)$/g, function(match, lang, code) {
-      const classLanguage = lang ? ` class="language-${lang}"` : '';
-      return `<pre><code${classLanguage}>${code}</code></pre>`;
-    });
+    // 2. Amankan karakter bawaan HTML
+    let html = teksBersih.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     
-    // 4. Inline Code (Latar transparan): Dikunci HANYA boleh satu baris agar teks TIDAK MELEBAR
-    html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    // 3. Pisahkan teks untuk mencegah Tag Bertumpuk
+    let parts = html.split(/(```[\s\S]*?```)/g);
     
-    // 5. Format Teks Tebal
-    html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    for (let i = 0; i < parts.length; i++) {
+      if (parts[i].startsWith('```') && parts[i].endsWith('```')) {
+        // INI BLOK KODINGAN
+        let match = parts[i].match(/```([a-zA-Z0-9_\-\+]*)\s*\n([\s\S]*?)```/);
+        if (match) {
+          let lang = match[1];
+          let code = match[2];
+          // Trik: Paksa isi nama bahasa jika AI lupa
+          let namaBahasa = lang ? lang : 'code'; 
+          parts[i] = `<pre><code class="language-${namaBahasa}">${code}</code></pre>`;
+        } else {
+          let code = parts[i].replace(/```/g, '').trim();
+          // Trik: Paksa isi nama bahasa jika match gagal
+          parts[i] = `<pre><code class="language-code">${code}</code></pre>`;
+        }
+      } else {
+        // INI TEKS BIASA
+        parts[i] = parts[i].replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+        parts[i] = parts[i].replace(/`([^`\n]+)`/g, '<code>$1</code>');
+      }
+    }
 
-    return html;
+    return parts.join('');
   }
 
   const teksHTML = konversiKeHTML(teks);
@@ -83,7 +93,6 @@ async function kirimPesanTelegram(chatId, teks) {
 
   let data = await res.json();
 
-  // Kebal Error: Jika format AI terlalu berantakan dan ditolak Telegram, kirim ulang sebagai teks biasa
   if (!data.ok) {
     console.error("Telegram HTML Error:", data);
     await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
@@ -305,11 +314,11 @@ export default async function handler(request) {
           body: JSON.stringify({ 
             model: "google/diffusiongemma-26b-a4b-it", 
             messages: riwayatSuper,
-            max_tokens: 4096,   // Sesuai saran dokumentasi resmi
-            temperature: 1.00,  // Sesuai saran dokumentasi resmi
-            top_p: 0.95,        // Sesuai saran dokumentasi resmi
+            max_tokens: 4096,
+            temperature: 1.00,
+            top_p: 0.95,
             stream: false,
-            chat_template_kwargs: { "enable_thinking": true } // 👈 FITUR THINKING AKTIF
+            chat_template_kwargs: { "enable_thinking": true } 
           }),
           signal: controller.signal
         });
@@ -391,5 +400,5 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-                             }
-      
+        }
+                                 
