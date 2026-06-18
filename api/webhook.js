@@ -8,7 +8,7 @@ export const config = {
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY; // 👈 DITAMBAHKAN UNTUK NVIDIA RESMI
 const CLIPDROP_API_KEY = process.env.CLIPDROP_API_KEY; 
 const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -130,7 +130,7 @@ export default async function handler(request) {
       await setRedis(`sesi_${chatId}`, "groq");
     } else if (pesanLowercase.includes("@super")) {
       await setRedis(`sesi_${chatId}`, "super");
-    } else if (pesanLowercase.includes("@nano")) { // 👈 Sesi Nano ditambahkan
+    } else if (pesanLowercase.includes("@nano")) { 
       await setRedis(`sesi_${chatId}`, "nano");
     } else if (pesanLowercase.includes("@gambar")) {
       await setRedis(`sesi_${chatId}`, "gambar");
@@ -155,7 +155,6 @@ export default async function handler(request) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
         imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
         
-        // 👈 Nano ditambahkan ke daftar yang butuh format Base64
         if (aiPilihan === "gemini" || aiPilihan === "nano") {
           let binary = '';
           const bytes = new Uint8Array(imageBuffer);
@@ -199,7 +198,7 @@ export default async function handler(request) {
       }
     }
       
-    // [B] GEMINI DENGAN MEMORI (Limit 6: 3 Pesan, 3 Respon)
+    // [B] GEMINI DENGAN MEMORI
     else if (aiPilihan === "gemini") {
       const pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis gambar ini dengan detail.";
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
@@ -232,7 +231,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
     }
 
-    // [C] GROQ DENGAN MEMORI (Limit 16: 8 Pesan, 8 Respon)
+    // [C] GROQ DENGAN MEMORI
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
       if (isImage) {
@@ -257,7 +256,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
-    // [D] NEMOTRON SUPER DENGAN MEMORI 
+    // [D] NEMOTRON SUPER (NVIDIA RESMI) DENGAN MEMORI 
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ Nemotron Super sedang merangkai jawaban...");
@@ -266,15 +265,18 @@ export default async function handler(request) {
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
       if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
 
-      const resSuper = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      // Menggunakan Endpoint Resmi NVIDIA
+      const resSuper = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}` 
+          'Authorization': `Bearer ${NVIDIA_API_KEY}`,
+          'Accept': 'application/json'
         },
         body: JSON.stringify({ 
-          model: "nvidia/nemotron-3-super-120b-a12b:free", 
-          messages: riwayatSuper 
+          model: "nvidia/llama-3.1-nemotron-70b-instruct", // Model Nemotron Text dari NVIDIA
+          messages: riwayatSuper,
+          max_tokens: 1024
         })
       });
       
@@ -282,8 +284,8 @@ export default async function handler(request) {
       let jawabanSuper = "";
 
       if (dataSuper.error) {
-        jawabanSuper = `⚠️ Error OpenRouter: ${dataSuper.error.message}`;
-        console.error("OpenRouter Error:", dataSuper.error);
+        jawabanSuper = `⚠️ Error NVIDIA API: ${dataSuper.error.message || JSON.stringify(dataSuper.error)}`;
+        console.error("NVIDIA API Error:", dataSuper.error);
       } else {
         jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Gagal memproses Nemotron Super (Data kosong).";
       }
@@ -293,13 +295,13 @@ export default async function handler(request) {
         await setRedis(`memori_super_${chatId}`, riwayatSuper);
       }
       
-      await kirimPesanTelegram(chatId, `[Nemotron Super]:\n\n${jawabanSuper}`);
+      await kirimPesanTelegram(chatId, `[Nemotron Super Resmi]:\n\n${jawabanSuper}`);
     }
 
-    // [E] NEMOTRON NANO 12B VL (VISION) DENGAN MEMORI 👈 DITAMBAHKAN
+    // [E] AI VISION NANO (NVIDIA RESMI) DENGAN MEMORI
     else if (aiPilihan === "nano") {
       const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Tolong jelaskan secara detail apa yang ada di gambar ini.";
-      await kirimPesanTelegram(chatId, "⏳ Nemotron Nano sedang melihat dan memproses...");
+      await kirimPesanTelegram(chatId, "⏳ NVIDIA Vision sedang melihat dan memproses...");
       
       let riwayatNano = await getRedis(`memori_nano_${chatId}`) || [];
       
@@ -318,15 +320,18 @@ export default async function handler(request) {
       riwayatNano.push({ role: "user", content: kontenPesan });
       if (riwayatNano.length > 16) riwayatNano = riwayatNano.slice(-16);
 
-      const resNano = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      // Menggunakan Endpoint Resmi NVIDIA
+      const resNano = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}` 
+          'Authorization': `Bearer ${NVIDIA_API_KEY}`,
+          'Accept': 'application/json'
         },
         body: JSON.stringify({ 
-          model: "nvidia/nemotron-nano-12b-v2-vl:free", 
-          messages: riwayatNano 
+          model: "meta/llama-3.2-11b-vision-instruct", // Model Vision ringan dan cepat di NVIDIA
+          messages: riwayatNano,
+          max_tokens: 1024
         })
       });
       
@@ -334,10 +339,10 @@ export default async function handler(request) {
       let jawabanNano = "";
 
       if (dataNano.error) {
-        jawabanNano = `⚠️ Error OpenRouter: ${dataNano.error.message}`;
-        console.error("OpenRouter Error:", dataNano.error);
+        jawabanNano = `⚠️ Error NVIDIA API: ${dataNano.error.message || JSON.stringify(dataNano.error)}`;
+        console.error("NVIDIA API Error:", dataNano.error);
       } else {
-        jawabanNano = dataNano.choices?.[0]?.message?.content || "⚠️ Gagal memproses Nemotron Nano (Data kosong).";
+        jawabanNano = dataNano.choices?.[0]?.message?.content || "⚠️ Gagal memproses Vision Nano (Data kosong).";
       }
       
       if (!jawabanNano.startsWith("⚠️")) {
@@ -345,7 +350,7 @@ export default async function handler(request) {
         await setRedis(`memori_nano_${chatId}`, riwayatNano);
       }
       
-      await kirimPesanTelegram(chatId, `[Nemotron Nano Vision]:\n\n${jawabanNano}`);
+      await kirimPesanTelegram(chatId, `[NVIDIA Vision Nano]:\n\n${jawabanNano}`);
     }
       
     // [F] PEXELS (GAMBAR)
@@ -371,5 +376,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-        }
-  
+                                                                                                                                                  }
