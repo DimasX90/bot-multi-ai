@@ -39,38 +39,31 @@ async function incrRedis(key) {
   return data.result;
 }
 
-// 👈 PERBAIKAN FINAL: Pemaksaan tombol Salin Kode agar selalu muncul & Sembunyikan <think>
+// 👈 FITUR TOMBOL SALIN KODE DIPERTAHANKAN
 async function kirimPesanTelegram(chatId, teks) {
   function konversiKeHTML(text) {
     if (!text) return "";
     
-    // 1. Sembunyikan teks <think> agar chat rapi
+    // Jaga-jaga jika AI masih mengeluarkan tag think
     let teksBersih = text.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
     if (teksBersih.trim() === "") teksBersih = text;
 
-    // 2. Amankan karakter bawaan HTML
     let html = teksBersih.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    
-    // 3. Pisahkan teks untuk mencegah Tag Bertumpuk
     let parts = html.split(/(```[\s\S]*?```)/g);
     
     for (let i = 0; i < parts.length; i++) {
       if (parts[i].startsWith('```') && parts[i].endsWith('```')) {
-        // INI BLOK KODINGAN
         let match = parts[i].match(/```([a-zA-Z0-9_\-\+]*)\s*\n([\s\S]*?)```/);
         if (match) {
           let lang = match[1];
           let code = match[2];
-          // Trik: Paksa isi nama bahasa jika AI lupa
           let namaBahasa = lang ? lang : 'code'; 
           parts[i] = `<pre><code class="language-${namaBahasa}">${code}</code></pre>`;
         } else {
           let code = parts[i].replace(/```/g, '').trim();
-          // Trik: Paksa isi nama bahasa jika match gagal
           parts[i] = `<pre><code class="language-code">${code}</code></pre>`;
         }
       } else {
-        // INI TEKS BIASA
         parts[i] = parts[i].replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
         parts[i] = parts[i].replace(/`([^`\n]+)`/g, '<code>$1</code>');
       }
@@ -129,7 +122,6 @@ export default async function handler(request) {
   try {
     const data = await request.json();
     
-    // --- 1. ANTI-SPAM ---
     const updateId = data.update_id;
     if (updateId) {
       const hitCount = await incrRedis(`spam_${updateId}`);
@@ -141,7 +133,6 @@ export default async function handler(request) {
     const pesanUser = messageData.text || messageData.caption || "";
     const pesanLowercase = pesanUser.toLowerCase().trim();
     
-    // --- DETEKSI FOTO ---
     const fotoMasuk = messageData.photo;
     const dokumenMasuk = messageData.document;
     
@@ -162,7 +153,6 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
     }
 
-    // --- 2. PINDAH SALURAN AI ---
     if (pesanLowercase.includes("@gemini") || (isImage && pesanUser === "" && !(await getRedis(`sesi_${chatId}`)) === "edit")) {
       await setRedis(`sesi_${chatId}`, "gemini");
     } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
@@ -184,7 +174,6 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
-    // --- 3. PENGUNDUHAN GAMBAR ---
     let imageBuffer = null;
     let base64Image = null;
     
@@ -200,9 +189,7 @@ export default async function handler(request) {
       }
     }
 
-    // --- 4. EKSEKUSI AI ---
-
-    // [A] CLIPDROP (EDIT GAMBAR HD)
+    // [A] CLIPDROP
     if (aiPilihan === "edit") {
       if (!isImage || !imageBuffer) {
         await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
@@ -290,16 +277,15 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
-    // [D] NEMOTRON SUPER (DIFFUSIONGEMMA) DENGAN FITUR THINKING RESMI & TIMEOUT SAFEGUARD
+    // [D] NEMOTRON SUPER (DIFFUSIONGEMMA) - FITUR THINKING DIMATIKAN
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ DiffusionGemma sedang berpikir...");
+      await kirimPesanTelegram(chatId, "⏳ DiffusionGemma sedang merangkai jawaban...");
       
       let riwayatSuper = await getRedis(`memori_super_${chatId}`) || [];
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
       if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
 
-      // Sinyal pemutus untuk mencegah Edge Timeout (25 detik) di Vercel
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000); 
 
@@ -314,11 +300,11 @@ export default async function handler(request) {
           body: JSON.stringify({ 
             model: "google/diffusiongemma-26b-a4b-it", 
             messages: riwayatSuper,
-            max_tokens: 4096,
-            temperature: 1.00,
+            max_tokens: 1024, // 👈 Diturunkan agar respon kilat
+            temperature: 0.7,
             top_p: 0.95,
             stream: false,
-            chat_template_kwargs: { "enable_thinking": true } 
+            chat_template_kwargs: { "enable_thinking": false } // 👈 FITUR THINKING DIMATIKAN
           }),
           signal: controller.signal
         });
@@ -335,14 +321,14 @@ export default async function handler(request) {
           jawabanSuper = `⚠️ Error API:\n${JSON.stringify(dataSuper).substring(0, 100)}`;
         }
         
-        await kirimPesanTelegram(chatId, `[DiffusionGemma Thinking]:\n\n${jawabanSuper}`);
+        await kirimPesanTelegram(chatId, `[DiffusionGemma]:\n\n${jawabanSuper}`);
 
       } catch (err) {
-        await kirimPesanTelegram(chatId, "⚠️ Waktu habis (Timeout 20s). Proses berpikir AI berjalan terlalu lama untuk batasan server Vercel.");
+        await kirimPesanTelegram(chatId, "⚠️ Waktu habis (Timeout). API NVIDIA merespon terlalu lama.");
       }
     }
 
-    // [E] AI VISION NANO (NVIDIA RESMI - LLAMA 3.2 11B VISION) + TIMEOUT SAFEGUARD
+    // [E] AI VISION NANO 
     else if (aiPilihan === "nano") {
       const pertanyaan = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
       await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang memproses gambar, mohon tunggu sebentar...");
@@ -377,7 +363,7 @@ export default async function handler(request) {
       }
     }
       
-    // [F] PEXELS (CARI GAMBAR STOK)
+    // [F] PEXELS
     else if (aiPilihan === "gambar") {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
       if (!promptGambar) {
@@ -400,5 +386,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-        }
-                                 
+            }
