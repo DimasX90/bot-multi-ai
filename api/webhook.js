@@ -39,12 +39,31 @@ async function incrRedis(key) {
   return data.result;
 }
 
+// 👈 PERBAIKAN: Fungsi pengiriman pesan dengan Markdown & Fallback
 async function kirimPesanTelegram(chatId, teks) {
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+  const payloadMarkdown = { 
+    chat_id: chatId, 
+    text: teks, 
+    parse_mode: 'Markdown' // Membuat kodingan bisa di-copy
+  };
+
+  let res = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text: teks }),
+    body: JSON.stringify(payloadMarkdown),
   });
+
+  let data = await res.json();
+
+  // Jika Telegram menolak karena AI mengirim format Markdown yang rusak, 
+  // kirim ulang pesannya sebagai teks biasa agar bot tidak diam/error.
+  if (!data.ok) {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: teks }),
+    });
+  }
 }
 
 async function kirimFotoBinaryTelegram(chatId, imageBuffer, caption) {
@@ -176,7 +195,6 @@ export default async function handler(request) {
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
       
       // --- 2. MENGIRIM UKURAN PASTI KE CLIPDROP ---
-      // Math.round memastikan angkanya bulat, tidak ada lagi error "NaN"
       formData.append('target_width', Math.round(targetW).toString());
       formData.append('target_height', Math.round(targetH).toString());
 
@@ -263,10 +281,9 @@ export default async function handler(request) {
           model: "google/diffusiongemma-26b-a4b-it", 
           messages: riwayatSuper,
           max_tokens: 4096,
-          temperature: 1.00, // Mengikuti saran resmi
-          top_p: 0.95,       // Mengikuti saran resmi
+          temperature: 1.00,
+          top_p: 0.95,       
           stream: false,
-          // 👈 FITUR "THINKING" DARI CONTOH RESMI
           chat_template_kwargs: { "enable_thinking": true } 
         })
       });
@@ -339,5 +356,5 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-  }
-            
+          }
+                        
