@@ -299,7 +299,7 @@ export default async function handler(request) {
           body: JSON.stringify({ 
             model: "google/diffusiongemma-26b-a4b-it", 
             messages: riwayatSuper,
-            max_tokens: 4096, 
+            max_tokens: 1024, 
             temperature: 1.00,
             top_p: 0.95,
             stream: false,
