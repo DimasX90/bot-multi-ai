@@ -39,24 +39,31 @@ async function incrRedis(key) {
   return data.result;
 }
 
-// 👈 PERBAIKAN: Mengamankan tag <think> agar tidak ditolak Telegram
+// 👈 FUNGSI UTAMA: Mengonversi pesan AI ke HTML Telegram agar muncul tombol "SALIN KODE" & Anti-Melebar
 async function kirimPesanTelegram(chatId, teks) {
   function konversiKeHTML(text) {
     if (!text) return "";
     
-    // 1. Amankan tag <think> dan karakter khusus
+    // 1. Amankan karakter khusus dan tag <think> agar tidak memicu error HTML di Telegram
     let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     
-    // 2. Format Blok Kode (Memicu tombol SALIN KODE)
-    html = html.replace(/```([a-zA-Z0-9-]*)\n([\s\S]*?)```/g, function(match, lang, code) {
+    // 2. Format Blok Kodingan (Triple Backtick) dengan Toleransi Spasi/Garis Baru
+    // Ini yang secara otomatis memicu tombol "SALIN KODE" bawaan Telegram
+    html = html.replace(/```([a-zA-Z0-9_\-\+]*)\s*\n([\s\S]*?)```/g, function(match, lang, code) {
+      const classLanguage = lang ? ` class="language-${lang}"` : '';
+      return `<pre><code${classLanguage}>${code}</code></pre>`;
+    });
+
+    // 3. Antisipasi jika AI lupa memberikan triple backtick penutup di akhir chat
+    html = html.replace(/```([a-zA-Z0-9_\-\+]*)\s*\n([\s\S]*)$/g, function(match, lang, code) {
       const classLanguage = lang ? ` class="language-${lang}"` : '';
       return `<pre><code${classLanguage}>${code}</code></pre>`;
     });
     
-    // 3. Format Inline Kode
+    // 4. Inline Code (Latar transparan): Dikunci HANYA boleh satu baris agar teks TIDAK MELEBAR
     html = html.replace(/`([^`\n]+)`/g, '<code>$1</code>');
     
-    // 4. Format Teks Tebal
+    // 5. Format Teks Tebal
     html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
     return html;
@@ -76,6 +83,7 @@ async function kirimPesanTelegram(chatId, teks) {
 
   let data = await res.json();
 
+  // Kebal Error: Jika format AI terlalu berantakan dan ditolak Telegram, kirim ulang sebagai teks biasa
   if (!data.ok) {
     console.error("Telegram HTML Error:", data);
     await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
@@ -112,6 +120,7 @@ export default async function handler(request) {
   try {
     const data = await request.json();
     
+    // --- 1. ANTI-SPAM ---
     const updateId = data.update_id;
     if (updateId) {
       const hitCount = await incrRedis(`spam_${updateId}`);
@@ -123,6 +132,7 @@ export default async function handler(request) {
     const pesanUser = messageData.text || messageData.caption || "";
     const pesanLowercase = pesanUser.toLowerCase().trim();
     
+    // --- DETEKSI FOTO ---
     const fotoMasuk = messageData.photo;
     const dokumenMasuk = messageData.document;
     
@@ -143,6 +153,7 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
     }
 
+    // --- 2. PINDAH SALURAN AI ---
     if (pesanLowercase.includes("@gemini") || (isImage && pesanUser === "" && !(await getRedis(`sesi_${chatId}`)) === "edit")) {
       await setRedis(`sesi_${chatId}`, "gemini");
     } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
@@ -164,6 +175,7 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
+    // --- 3. PENGUNDUHAN GAMBAR ---
     let imageBuffer = null;
     let base64Image = null;
     
@@ -179,7 +191,9 @@ export default async function handler(request) {
       }
     }
 
-    // [A] CLIPDROP 
+    // --- 4. EKSEKUSI AI ---
+
+    // [A] CLIPDROP (EDIT GAMBAR HD)
     if (aiPilihan === "edit") {
       if (!isImage || !imageBuffer) {
         await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
@@ -205,7 +219,7 @@ export default async function handler(request) {
       formData.append('target_width', Math.round(targetW).toString());
       formData.append('target_height', Math.round(targetH).toString());
 
-      const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
+      const resClipdrop = await fetch('[https://clipdrop-api.co/image-upscaling/v1/upscale](https://clipdrop-api.co/image-upscaling/v1/upscale)', {
         method: 'POST',
         headers: { 'x-api-key': CLIPDROP_API_KEY },
         body: formData
@@ -257,7 +271,7 @@ export default async function handler(request) {
       let riwayatChat = await getRedis(`memori_${chatId}`) || [];
       riwayatChat.push({ role: "user", content: pertanyaanClean });
       if (riwayatChat.length > 16) riwayatChat = riwayatChat.slice(-16);
-      const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat })});
+      const resGroq = await fetch("[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat })});
       const groqData = await resGroq.json();
       const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses Groq.";
       if (!jawabanGroq.startsWith("⚠️")) {
@@ -267,7 +281,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
-    // [D] NEMOTRON SUPER (DIFFUSIONGEMMA) + THINKING 
+    // [D] NEMOTRON SUPER (DIFFUSIONGEMMA) DENGAN FITUR THINKING RESMI & TIMEOUT SAFEGUARD
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ DiffusionGemma sedang berpikir...");
@@ -276,11 +290,12 @@ export default async function handler(request) {
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
       if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
 
+      // Sinyal pemutus untuk mencegah Edge Timeout (25 detik) di Vercel
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000); 
 
       try {
-        const resSuper = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        const resSuper = await fetch("[https://integrate.api.nvidia.com/v1/chat/completions](https://integrate.api.nvidia.com/v1/chat/completions)", {
           method: 'POST', 
           headers: { 
             'Content-Type': 'application/json', 
@@ -288,15 +303,13 @@ export default async function handler(request) {
             'Accept': 'application/json'
           },
           body: JSON.stringify({ 
-            // 👈 Kembali menggunakan model yang kamu minta
             model: "google/diffusiongemma-26b-a4b-it", 
             messages: riwayatSuper,
-            max_tokens: 4096,
-            temperature: 1.00,
-            top_p: 0.95,       
+            max_tokens: 4096,   // Sesuai saran dokumentasi resmi
+            temperature: 1.00,  // Sesuai saran dokumentasi resmi
+            top_p: 0.95,        // Sesuai saran dokumentasi resmi
             stream: false,
-            // 👈 Fitur thinking DIAKTIFKAN
-            chat_template_kwargs: { "enable_thinking": true } 
+            chat_template_kwargs: { "enable_thinking": true } // 👈 FITUR THINKING AKTIF
           }),
           signal: controller.signal
         });
@@ -320,7 +333,7 @@ export default async function handler(request) {
       }
     }
 
-    // [E] AI VISION NANO (NVIDIA RESMI) DENGAN MEMORI
+    // [E] AI VISION NANO (NVIDIA RESMI - LLAMA 3.2 11B VISION) + TIMEOUT SAFEGUARD
     else if (aiPilihan === "nano") {
       const pertanyaan = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
       await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang memproses gambar, mohon tunggu sebentar...");
@@ -334,7 +347,7 @@ export default async function handler(request) {
         }
         konten.push({ type: "text", text: pertanyaan });
 
-        const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        const res = await fetch("[https://integrate.api.nvidia.com/v1/chat/completions](https://integrate.api.nvidia.com/v1/chat/completions)", {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
         body: JSON.stringify({ 
@@ -355,7 +368,7 @@ export default async function handler(request) {
       }
     }
       
-    // [F] PEXELS (GAMBAR)
+    // [F] PEXELS (CARI GAMBAR STOK)
     else if (aiPilihan === "gambar") {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
       if (!promptGambar) {
@@ -378,5 +391,5 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-}
-  
+                             }
+      
