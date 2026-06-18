@@ -41,23 +41,37 @@ async function incrRedis(key) {
 
 // 👈 PERBAIKAN: Fungsi pengiriman pesan dengan Markdown & Fallback
 async function kirimPesanTelegram(chatId, teks) {
-  const payloadMarkdown = { 
-    chat_id: chatId, 
-    text: teks, 
-    parse_mode: 'Markdown' // Membuat kodingan bisa di-copy
-  };
+  // 1. Amankan karakter khusus agar tidak merusak format HTML Telegram
+  let amanTeks = teks
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // 2. Ubah blok kodingan AI (```) menjadi format HTML Telegram <pre><code>
+  // Ini yang membuat kodingan ada di dalam kotak dan bisa di-copy!
+  amanTeks = amanTeks.replace(/```[a-zA-Z]*\n?([\s\S]*?)```/g, '<pre><code class="language-code">$1</code></pre>');
+  
+  // 3. Ubah teks tebal (**teks**) menjadi <b>teks</b>
+  amanTeks = amanTeks.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+  // 4. Ubah teks kode inline (`teks`) menjadi <code>teks</code>
+  amanTeks = amanTeks.replace(/`([^`]+)`/g, '<code>$1</code>');
 
   let res = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payloadMarkdown),
+    body: JSON.stringify({ 
+        chat_id: chatId, 
+        text: amanTeks, 
+        parse_mode: 'HTML' // 👈 Kita pakai HTML agar kebal error
+    }),
   });
 
   let data = await res.json();
 
-  // Jika Telegram menolak karena AI mengirim format Markdown yang rusak, 
-  // kirim ulang pesannya sebagai teks biasa agar bot tidak diam/error.
+  // Jika tetap gagal karena format sangat tidak beraturan, kirim sebagai teks biasa
   if (!data.ok) {
+    console.error("Telegram Format Error:", data);
     await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
