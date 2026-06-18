@@ -8,7 +8,7 @@ export const config = {
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY; // 👈 DITAMBAHKAN UNTUK NVIDIA RESMI
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY; // 👈 API NVIDIA RESMI
 const CLIPDROP_API_KEY = process.env.CLIPDROP_API_KEY; 
 const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -91,32 +91,16 @@ export default async function handler(request) {
     
     let fileIdToDownload = null;
     let isImage = false;
-    let targetW = 2048;
-    let targetH = 2048;
 
+    // Ambil ukuran foto yang aman
     if (fotoMasuk) {
-      const indexFoto = fotoMasuk.length - 1; 
+      const indexFoto = fotoMasuk.length > 1 ? 1 : 0; 
       fileIdToDownload = fotoMasuk[indexFoto].file_id;
       isImage = true;
-      const origW = fotoMasuk[indexFoto].width || 1024;
-      const origH = fotoMasuk[indexFoto].height || 1024;
-      targetW = origW * 2;
-      targetH = origH * 2;
     } 
     else if (dokumenMasuk && dokumenMasuk.mime_type && dokumenMasuk.mime_type.startsWith('image/')) {
       fileIdToDownload = dokumenMasuk.file_id;
       isImage = true;
-    }
-
-    if (targetW > 2048 || targetH > 2048) {
-      const ratio = targetW / targetH;
-      if (targetW > targetH) {
-        targetW = 2048;
-        targetH = Math.round(2048 / ratio);
-      } else {
-        targetH = 2048;
-        targetW = Math.round(2048 * ratio);
-      }
     }
 
     if (!chatId || (pesanUser === "" && !isImage)) {
@@ -179,8 +163,6 @@ export default async function handler(request) {
 
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
-      formData.append('target_width', targetW.toString());  
-      formData.append('target_height', targetH.toString()); 
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
@@ -194,7 +176,7 @@ export default async function handler(request) {
       } else {
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Alasan dari Clipdrop:\n\n${errorData}`);
+        await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Pastikan API Key aktif dan resolusi sesuai.\nError:\n${errorData.substring(0, 50)}`);
       }
     }
       
@@ -265,16 +247,14 @@ export default async function handler(request) {
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
       if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
 
-      // Menggunakan Endpoint Resmi NVIDIA
       const resSuper = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${NVIDIA_API_KEY}`,
-          'Accept': 'application/json'
+          'Authorization': `Bearer ${NVIDIA_API_KEY}`
         },
         body: JSON.stringify({ 
-          model: "nvidia/llama-3.1-nemotron-70b-instruct", // Model Nemotron Text dari NVIDIA
+          model: "nvidia/nemotron-3-super-120b-a12b", // 👈 Model Sesuai Screenshot
           messages: riwayatSuper,
           max_tokens: 1024
         })
@@ -283,19 +263,16 @@ export default async function handler(request) {
       const dataSuper = await resSuper.json();
       let jawabanSuper = "";
 
-      if (dataSuper.error) {
-        jawabanSuper = `⚠️ Error NVIDIA API: ${dataSuper.error.message || JSON.stringify(dataSuper.error)}`;
-        console.error("NVIDIA API Error:", dataSuper.error);
+      if (!resSuper.ok) {
+        jawabanSuper = `⚠️ Error NVIDIA API: ${JSON.stringify(dataSuper)}`;
+        console.error("NVIDIA API Error:", dataSuper);
       } else {
-        jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Gagal memproses Nemotron Super (Data kosong).";
-      }
-      
-      if (!jawabanSuper.startsWith("⚠️")) {
+        jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Gagal memproses (Data kosong).";
         riwayatSuper.push({ role: "assistant", content: jawabanSuper });
         await setRedis(`memori_super_${chatId}`, riwayatSuper);
       }
       
-      await kirimPesanTelegram(chatId, `[Nemotron Super Resmi]:\n\n${jawabanSuper}`);
+      await kirimPesanTelegram(chatId, `[Nemotron Super 120B]:\n\n${jawabanSuper}`);
     }
 
     // [E] AI VISION NANO (NVIDIA RESMI) DENGAN MEMORI
@@ -303,7 +280,16 @@ export default async function handler(request) {
       const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Tolong jelaskan secara detail apa yang ada di gambar ini.";
       await kirimPesanTelegram(chatId, "⏳ NVIDIA Vision sedang melihat dan memproses...");
       
-      let riwayatNano = await getRedis(`memori_nano_${chatId}`) || [];
+      let riwayatNanoMentah = await getRedis(`memori_nano_${chatId}`) || [];
+      
+      // Mencegah error "At most 1 image" dengan mengubah gambar lama di memori jadi teks
+      let riwayatNanoBersih = riwayatNanoMentah.map(msg => {
+        if (Array.isArray(msg.content)) {
+          const textOnly = msg.content.find(p => p.type === "text")?.text || "[Gambar lama]";
+          return { role: msg.role, content: textOnly };
+        }
+        return msg;
+      });
       
       let kontenPesan = [];
       kontenPesan.push({ type: "text", text: pertanyaanClean });
@@ -317,20 +303,18 @@ export default async function handler(request) {
         });
       }
 
-      riwayatNano.push({ role: "user", content: kontenPesan });
-      if (riwayatNano.length > 16) riwayatNano = riwayatNano.slice(-16);
+      riwayatNanoBersih.push({ role: "user", content: kontenPesan });
+      if (riwayatNanoBersih.length > 16) riwayatNanoBersih = riwayatNanoBersih.slice(-16);
 
-      // Menggunakan Endpoint Resmi NVIDIA
       const resNano = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${NVIDIA_API_KEY}`,
-          'Accept': 'application/json'
+          'Authorization': `Bearer ${NVIDIA_API_KEY}`
         },
         body: JSON.stringify({ 
-          model: "meta/llama-3.2-11b-vision-instruct", // Model Vision ringan dan cepat di NVIDIA
-          messages: riwayatNano,
+          model: "meta/llama-3.2-11b-vision-instruct", 
+          messages: riwayatNanoBersih,
           max_tokens: 1024
         })
       });
@@ -338,16 +322,16 @@ export default async function handler(request) {
       const dataNano = await resNano.json();
       let jawabanNano = "";
 
-      if (dataNano.error) {
-        jawabanNano = `⚠️ Error NVIDIA API: ${dataNano.error.message || JSON.stringify(dataNano.error)}`;
-        console.error("NVIDIA API Error:", dataNano.error);
+      if (!resNano.ok) {
+        jawabanNano = `⚠️ Error NVIDIA API: ${JSON.stringify(dataNano)}`;
+        console.error("NVIDIA Vision Error:", dataNano);
       } else {
         jawabanNano = dataNano.choices?.[0]?.message?.content || "⚠️ Gagal memproses Vision Nano (Data kosong).";
-      }
-      
-      if (!jawabanNano.startsWith("⚠️")) {
-        riwayatNano.push({ role: "assistant", content: jawabanNano });
-        await setRedis(`memori_nano_${chatId}`, riwayatNano);
+        
+        riwayatNanoMentah.push({ role: "user", content: kontenPesan });
+        riwayatNanoMentah.push({ role: "assistant", content: jawabanNano });
+        if (riwayatNanoMentah.length > 16) riwayatNanoMentah = riwayatNanoMentah.slice(-16);
+        await setRedis(`memori_nano_${chatId}`, riwayatNanoMentah);
       }
       
       await kirimPesanTelegram(chatId, `[NVIDIA Vision Nano]:\n\n${jawabanNano}`);
@@ -376,4 +360,5 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-                                                                                                                                                  }
+    }
+               
