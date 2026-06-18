@@ -274,44 +274,40 @@ export default async function handler(request) {
     // [E] AI VISION NANO (NVIDIA RESMI) DENGAN MEMORI
     else if (aiPilihan === "nano") {
       const pertanyaan = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
-      await kirimPesanTelegram(chatId, "⏳ NVIDIA Vision sedang menganalisis...");
       
-      // 1. Buat array konten baru yang benar-benar bersih
-      let kontenPesan = [];
+      // 1. Berikan respon instan ke Telegram agar Vercel tidak timeout
+      await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang memproses gambar, mohon tunggu sebentar...");
 
-      // 2. Tambahkan HANYA gambar terbaru (jika ada)
-      if (base64Image) {
-        kontenPesan.push({ 
-          type: "image_url", 
-          image_url: { url: `data:image/jpeg;base64,${base64Image}` } 
+      // 2. Gunakan 'fetch' dengan timeout yang lebih pendek agar tidak menggantung
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // Batasi proses 20 detik
+
+      try {
+        let konten = [];
+        if (base64Image) {
+            konten.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } });
+        }
+        konten.push({ type: "text", text: pertanyaan });
+
+        const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
+            body: JSON.stringify({ 
+                model: "meta/llama-3.2-90b-vision-instruct", 
+                messages: [{ role: "user", content: konten }],
+                max_tokens: 500, // 👈 KURANGI max_tokens agar respon lebih cepat
+                temperature: 0.5
+            }),
+            signal: controller.signal
         });
-      }
+        
+        clearTimeout(timeoutId);
+        const data = await res.json();
+        const jawaban = data.choices?.[0]?.message?.content || "Respon kosong.";
+        await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
 
-      // 3. Tambahkan teks
-      kontenPesan.push({ type: "text", text: pertanyaan });
-
-      // 4. Kirim ke API dengan struktur yang dipaksa hanya 1 gambar
-      const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-        method: 'POST', 
-        headers: { 
-          'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${NVIDIA_API_KEY}` 
-        },
-        body: JSON.stringify({ 
-          model: "meta/llama-3.2-90b-vision-instruct", 
-          messages: [{ role: "user", content: kontenPesan }], 
-          max_tokens: 1024,
-          temperature: 0.7
-        })
-      });
-      
-      const data = await res.json();
-      
-      if (!res.ok) {
-        await kirimPesanTelegram(chatId, `⚠️ Error API NVIDIA: ${data.error?.message || JSON.stringify(data)}`);
-      } else {
-        const jawaban = data.choices?.[0]?.message?.content || "Tidak ada respon.";
-        await kirimPesanTelegram(chatId, `[NVIDIA Vision 90B]:\n\n${jawaban}`);
+      } catch (err) {
+        await kirimPesanTelegram(chatId, "⚠️ Terjadi timeout. Model terlalu sibuk. Coba lagi nanti atau gunakan @gemini.");
       }
     }
       
