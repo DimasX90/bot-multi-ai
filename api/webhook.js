@@ -39,26 +39,29 @@ async function incrRedis(key) {
   return data.result;
 }
 
-// 👈 FITUR TOMBOL SALIN KODE DIPERTAHANKAN
+// 👈 PERBAIKAN HTML: Mengamankan tag <think> dan memunculkan tombol Salin
 async function kirimPesanTelegram(chatId, teks) {
+  // Cegah error Telegram jika teks AI terlalu panjang (Batas 4096 karakter)
+  if (teks.length > 4000) {
+    teks = teks.substring(0, 4000) + "\n\n...[Teks dipotong karena batas Telegram]";
+  }
+
   function konversiKeHTML(text) {
     if (!text) return "";
     
-    // Jaga-jaga jika AI masih mengeluarkan tag think
-    let teksBersih = text.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
-    if (teksBersih.trim() === "") teksBersih = text;
-
-    let html = teksBersih.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Amankan <think> menjadi teks biasa yang aman untuk HTML Telegram
+    let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    // Pisahkan teks dan kodingan
     let parts = html.split(/(```[\s\S]*?```)/g);
     
     for (let i = 0; i < parts.length; i++) {
       if (parts[i].startsWith('```') && parts[i].endsWith('```')) {
         let match = parts[i].match(/```([a-zA-Z0-9_\-\+]*)\s*\n([\s\S]*?)```/);
         if (match) {
-          let lang = match[1];
+          let lang = match[1] || 'code';
           let code = match[2];
-          let namaBahasa = lang ? lang : 'code'; 
-          parts[i] = `<pre><code class="language-${namaBahasa}">${code}</code></pre>`;
+          parts[i] = `<pre><code class="language-${lang}">${code}</code></pre>`;
         } else {
           let code = parts[i].replace(/```/g, '').trim();
           parts[i] = `<pre><code class="language-code">${code}</code></pre>`;
@@ -68,7 +71,6 @@ async function kirimPesanTelegram(chatId, teks) {
         parts[i] = parts[i].replace(/`([^`\n]+)`/g, '<code>$1</code>');
       }
     }
-
     return parts.join('');
   }
 
@@ -277,7 +279,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
-    // [D] NEMOTRON SUPER (DIFFUSIONGEMMA) - FITUR THINKING SUDAH DIMATIKAN
+    // [D] NEMOTRON SUPER - BOM WAKTU DIHAPUS & THINKING DIAKTIFKAN KEMBALI
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ DiffusionGemma sedang merangkai jawaban...");
@@ -285,9 +287,6 @@ export default async function handler(request) {
       let riwayatSuper = await getRedis(`memori_super_${chatId}`) || [];
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
       if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); 
 
       try {
         const resSuper = await fetch("[https://integrate.api.nvidia.com/v1/chat/completions](https://integrate.api.nvidia.com/v1/chat/completions)", {
@@ -300,17 +299,14 @@ export default async function handler(request) {
           body: JSON.stringify({ 
             model: "google/diffusiongemma-26b-a4b-it", 
             messages: riwayatSuper,
-            max_tokens: 1024, // 👈 Diturunkan agar respon sangat kilat
-            temperature: 0.7,
+            max_tokens: 4096, 
+            temperature: 1.00,
             top_p: 0.95,
             stream: false,
-            // 👈 BENAR-BENAR DIMATIKAN KALI INI
-            chat_template_kwargs: { "enable_thinking": false } 
-          }),
-          signal: controller.signal
+            chat_template_kwargs: { "enable_thinking": true } // 👈 THINKING KEMBALI AKTIF!
+          })
         });
         
-        clearTimeout(timeoutId);
         const dataSuper = await resSuper.json();
         let jawabanSuper = "";
 
@@ -325,7 +321,8 @@ export default async function handler(request) {
         await kirimPesanTelegram(chatId, `[DiffusionGemma]:\n\n${jawabanSuper}`);
 
       } catch (err) {
-        await kirimPesanTelegram(chatId, "⚠️ Waktu habis (Timeout). API NVIDIA merespon terlalu lama.");
+        // Jika server Vercel memotong koneksi karena lebih dari batas (25s)
+        await kirimPesanTelegram(chatId, "⚠️ Server AI NVIDIA membutuhkan waktu terlalu lama. Silakan coba lagi.");
       }
     }
 
@@ -387,4 +384,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-            }
+          }
