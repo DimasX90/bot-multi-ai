@@ -290,16 +290,15 @@ export default async function handler(request) {
         konten.push({ type: "text", text: pertanyaan });
 
         const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
-            body: JSON.stringify({ 
-                model: "meta/llama-3.2-90b-vision-instruct", 
-                messages: [{ role: "user", content: konten }],
-                max_tokens: 500, // 👈 KURANGI max_tokens agar respon lebih cepat
-                temperature: 0.5
-            }),
-            signal: controller.signal
-        });
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
+        body: JSON.stringify({ 
+          model: "meta/llama-3.2-11b-vision-instruct", // 👈 Model yang jauh lebih ringan & cepat
+          messages: [{ role: "user", content: konten }],
+          max_tokens: 500, // 👈 Tetap batasi token agar respon instan
+          temperature: 0.5
+        })
+      });
         
         clearTimeout(timeoutId);
         const data = await res.json();
