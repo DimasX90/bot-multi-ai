@@ -276,33 +276,30 @@ export default async function handler(request) {
       const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Tolong jelaskan secara detail apa yang ada di gambar ini.";
       await kirimPesanTelegram(chatId, "⏳ NVIDIA Vision sedang melihat dan memproses...");
       
+      // Mengambil riwayat memori
       let riwayatNanoMentah = await getRedis(`memori_nano_${chatId}`) || [];
       
-      let riwayatNanoBersih = riwayatNanoMentah.map(msg => {
-        if (Array.isArray(msg.content)) {
-          const textOnly = msg.content.find(p => p.type === "text")?.text || "[Gambar lama]";
-          return { role: msg.role, content: textOnly };
-        }
-        return msg;
-      });
-      
+      // Mempersiapkan konten pesan (Gabungan Gambar + Teks)
       let kontenPesan = [];
-      
-      // 👈 PERBAIKAN: Masukkan GAMBAR DULU, baru teks, agar AI tidak buta
       if (base64Image) {
         kontenPesan.push({ 
           type: "image_url", 
-          image_url: { 
-            url: `data:image/jpeg;base64,${base64Image}` 
-          } 
+          image_url: { url: `data:image/jpeg;base64,${base64Image}` } 
         });
       }
-      
       kontenPesan.push({ type: "text", text: pertanyaanClean });
 
+      // Memformat riwayat untuk dikirim ke API NVIDIA
+      // Kita perlu menyederhanakan riwayat agar tetap sesuai dengan format NVIDIA
+      let riwayatNanoBersih = riwayatNanoMentah.map(msg => ({
+          role: msg.role,
+          content: msg.content // NVIDIA menerima array content ini dengan baik
+      }));
+      
       riwayatNanoBersih.push({ role: "user", content: kontenPesan });
-      if (riwayatNanoBersih.length > 16) riwayatNanoBersih = riwayatNanoBersih.slice(-16);
+      if (riwayatNanoBersih.length > 10) riwayatNanoBersih = riwayatNanoBersih.slice(-10); // Batasi memori agar tidak terlalu berat
 
+      // Eksekusi API NVIDIA
       const resNano = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: 'POST', 
         headers: { 
@@ -310,7 +307,6 @@ export default async function handler(request) {
           'Authorization': `Bearer ${NVIDIA_API_KEY}`
         },
         body: JSON.stringify({ 
-          // 👈 PERBAIKAN: Model diubah sesuai screenshot dari NVIDIA
           model: "meta/llama-3.2-90b-vision-instruct", 
           messages: riwayatNanoBersih,
           max_tokens: 1024,
@@ -319,22 +315,20 @@ export default async function handler(request) {
       });
       
       const dataNano = await resNano.json();
-      let jawabanNano = "";
 
       if (!resNano.ok) {
-        jawabanNano = `⚠️ Error NVIDIA API: ${JSON.stringify(dataNano)}`;
-        console.error("NVIDIA Vision Error:", dataNano);
+        await kirimPesanTelegram(chatId, `⚠️ Error NVIDIA API: ${JSON.stringify(dataNano.error || dataNano)}`);
       } else {
-        jawabanNano = dataNano.choices?.[0]?.message?.content || "⚠️ Gagal memproses Vision Nano (Data kosong).";
+        const jawabanNano = dataNano.choices?.[0]?.message?.content || "⚠️ Gagal memproses Vision Nano.";
         
+        // Simpan ke memori
         riwayatNanoMentah.push({ role: "user", content: kontenPesan });
         riwayatNanoMentah.push({ role: "assistant", content: jawabanNano });
-        if (riwayatNanoMentah.length > 16) riwayatNanoMentah = riwayatNanoMentah.slice(-16);
+        if (riwayatNanoMentah.length > 10) riwayatNanoMentah = riwayatNanoMentah.slice(-10);
         await setRedis(`memori_nano_${chatId}`, riwayatNanoMentah);
+        
+        await kirimPesanTelegram(chatId, `[NVIDIA Vision 90B]:\n\n${jawabanNano}`);
       }
-      
-      // 👈 PERBAIKAN: Judul balasan bot diperbarui menjadi 90B
-      await kirimPesanTelegram(chatId, `[NVIDIA Vision 90B]:\n\n${jawabanNano}`);
     }
       
     // [F] PEXELS (GAMBAR)
