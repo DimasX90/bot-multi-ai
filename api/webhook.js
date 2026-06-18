@@ -313,37 +313,54 @@ export default async function handler(request) {
     }
 
     // [E] AI VISION NANO (NVIDIA RESMI) DENGAN MEMORI
-    else if (aiPilihan === "nano") {
-      const pertanyaan = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
-      await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang memproses gambar, mohon tunggu sebentar...");
+    else if (aiPilihan === "super") {
+      const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
+      await kirimPesanTelegram(chatId, "⏳ DiffusionGemma sedang berpikir dalam-dalam...");
+      
+      let riwayatSuper = await getRedis(`memori_super_${chatId}`) || [];
+      riwayatSuper.push({ role: "user", content: pertanyaanClean });
+      if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
+
+      // Pengaman waktu tetap dipasang agar bot tidak hang
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 20000); 
 
       try {
-        let konten = [];
-        if (base64Image) {
-            konten.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } });
-        }
-        konten.push({ type: "text", text: pertanyaan });
-
-        const res = await fetch("[https://integrate.api.nvidia.com/v1/chat/completions](https://integrate.api.nvidia.com/v1/chat/completions)", {
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
-        body: JSON.stringify({ 
-          model: "meta/llama-3.2-11b-vision-instruct", 
-          messages: [{ role: "user", content: konten }],
-          max_tokens: 500, 
-          temperature: 0.5
-        })
-      });
+        const resSuper = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+          method: 'POST', 
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${NVIDIA_API_KEY}`,
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ 
+            model: "google/diffusiongemma-26b-a4b-it", 
+            messages: riwayatSuper,
+            max_tokens: 4096, // 👈 Dikembalikan ke 4096 agar AI bebas berpikir panjang
+            temperature: 1.00,
+            top_p: 0.95,       
+            stream: false,
+            chat_template_kwargs: { "enable_thinking": true } // 👈 FITUR THINKING DIAKTIFKAN
+          }),
+          signal: controller.signal
+        });
         
         clearTimeout(timeoutId);
-        const data = await res.json();
-        const jawaban = data.choices?.[0]?.message?.content || "Respon kosong.";
-        await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
+        const dataSuper = await resSuper.json();
+        let jawabanSuper = "";
+
+        if (resSuper.ok) {
+          jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Balasan kosong.";
+          riwayatSuper.push({ role: "assistant", content: jawabanSuper });
+          await setRedis(`memori_super_${chatId}`, riwayatSuper);
+        } else {
+          jawabanSuper = `⚠️ Error dari server API:\n${JSON.stringify(dataSuper).substring(0, 100)}`;
+        }
+        
+        await kirimPesanTelegram(chatId, `[DiffusionGemma Thinking]:\n\n${jawabanSuper}`);
 
       } catch (err) {
-        await kirimPesanTelegram(chatId, "⚠️ Terjadi timeout. Model terlalu sibuk. Coba lagi nanti atau gunakan @gemini.");
+        await kirimPesanTelegram(chatId, "⚠️ Waktu habis (Timeout). Proses berpikir AI terlalu lama untuk batas waktu Vercel (25 detik).");
       }
     }
       
