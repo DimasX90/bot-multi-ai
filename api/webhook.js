@@ -277,7 +277,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
-    // [D] NEMOTRON SUPER (DIFFUSIONGEMMA) - FITUR THINKING DIMATIKAN
+    // [D] NEMOTRON SUPER (DIFFUSIONGEMMA) - FITUR THINKING SUDAH DIMATIKAN
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ DiffusionGemma sedang merangkai jawaban...");
@@ -300,11 +300,12 @@ export default async function handler(request) {
           body: JSON.stringify({ 
             model: "google/diffusiongemma-26b-a4b-it", 
             messages: riwayatSuper,
-            max_tokens: 1024, // 👈 Diturunkan agar respon kilat
+            max_tokens: 1024, // 👈 Diturunkan agar respon sangat kilat
             temperature: 0.7,
             top_p: 0.95,
             stream: false,
-            chat_template_kwargs: { "enable_thinking": false } // 👈 FITUR THINKING DIMATIKAN
+            // 👈 BENAR-BENAR DIMATIKAN KALI INI
+            chat_template_kwargs: { "enable_thinking": false } 
           }),
           signal: controller.signal
         });
