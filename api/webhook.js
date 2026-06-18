@@ -140,12 +140,8 @@ export default async function handler(request) {
         imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
         
         if (aiPilihan === "gemini" || aiPilihan === "nano") {
-          let binary = '';
-          const bytes = new Uint8Array(imageBuffer);
-          for (let i = 0; i < bytes.byteLength; i++) {
-              binary += String.fromCharCode(bytes[i]);
-          }
-          base64Image = btoa(binary);
+          // 👈 PERBAIKAN: Menggunakan Buffer agar gambar tidak korup/rusak
+          base64Image = Buffer.from(imageBuffer).toString('base64');
         }
       }
     }
@@ -254,7 +250,7 @@ export default async function handler(request) {
           'Authorization': `Bearer ${NVIDIA_API_KEY}`
         },
         body: JSON.stringify({ 
-          model: "nvidia/nemotron-3-super-120b-a12b", // 👈 Model Sesuai Screenshot
+          model: "nvidia/nemotron-3-super-120b-a12b", 
           messages: riwayatSuper,
           max_tokens: 1024
         })
@@ -282,7 +278,6 @@ export default async function handler(request) {
       
       let riwayatNanoMentah = await getRedis(`memori_nano_${chatId}`) || [];
       
-      // Mencegah error "At most 1 image" dengan mengubah gambar lama di memori jadi teks
       let riwayatNanoBersih = riwayatNanoMentah.map(msg => {
         if (Array.isArray(msg.content)) {
           const textOnly = msg.content.find(p => p.type === "text")?.text || "[Gambar lama]";
@@ -292,8 +287,8 @@ export default async function handler(request) {
       });
       
       let kontenPesan = [];
-      kontenPesan.push({ type: "text", text: pertanyaanClean });
-
+      
+      // 👈 PERBAIKAN: Masukkan GAMBAR DULU, baru teks, agar AI tidak buta
       if (base64Image) {
         kontenPesan.push({ 
           type: "image_url", 
@@ -302,6 +297,8 @@ export default async function handler(request) {
           } 
         });
       }
+      
+      kontenPesan.push({ type: "text", text: pertanyaanClean });
 
       riwayatNanoBersih.push({ role: "user", content: kontenPesan });
       if (riwayatNanoBersih.length > 16) riwayatNanoBersih = riwayatNanoBersih.slice(-16);
@@ -313,9 +310,11 @@ export default async function handler(request) {
           'Authorization': `Bearer ${NVIDIA_API_KEY}`
         },
         body: JSON.stringify({ 
-          model: "meta/llama-3.2-11b-vision-instruct", 
+          // 👈 PERBAIKAN: Model diubah sesuai screenshot dari NVIDIA
+          model: "meta/llama-3.2-90b-vision-instruct", 
           messages: riwayatNanoBersih,
-          max_tokens: 1024
+          max_tokens: 1024,
+          temperature: 0.7
         })
       });
       
@@ -334,7 +333,8 @@ export default async function handler(request) {
         await setRedis(`memori_nano_${chatId}`, riwayatNanoMentah);
       }
       
-      await kirimPesanTelegram(chatId, `[NVIDIA Vision Nano]:\n\n${jawabanNano}`);
+      // 👈 PERBAIKAN: Judul balasan bot diperbarui menjadi 90B
+      await kirimPesanTelegram(chatId, `[NVIDIA Vision 90B]:\n\n${jawabanNano}`);
     }
       
     // [F] PEXELS (GAMBAR)
@@ -360,5 +360,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-    }
-               
+}
