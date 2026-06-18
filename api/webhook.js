@@ -182,7 +182,7 @@ export default async function handler(request) {
       } else {
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Pastikan API Key aktif.\nError: ${errorData.substring(0, 200)}`);
+        await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Pastikan API Key aktif.\nError: ${errorData.substring(0, 100)}`);
       }
     }
       
