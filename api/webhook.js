@@ -246,9 +246,7 @@ export default async function handler(request) {
     // [D] NEMOTRON SUPER (NVIDIA RESMI) DENGAN MEMORI 
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
-      
-      // 1. Beri tahu user bahwa AI yang baru sedang merespons
-      await kirimPesanTelegram(chatId, "⏳ DiffusionGemma (Super Cepat) sedang memproses...");
+      await kirimPesanTelegram(chatId, "⏳ DiffusionGemma sedang berpikir...");
       
       let riwayatSuper = await getRedis(`memori_super_${chatId}`) || [];
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
@@ -262,30 +260,25 @@ export default async function handler(request) {
           'Accept': 'application/json'
         },
         body: JSON.stringify({ 
-          // 👈 INI DIA! Otaknya sudah diganti ke model baru dari screenshot-mu
           model: "google/diffusiongemma-26b-a4b-it", 
           messages: riwayatSuper,
-          max_tokens: 4096, // 👈 Disesuaikan dengan batas di screenshot NVIDIA
-          temperature: 0.7,
-          top_p: 1.00,
-          stream: false
+          max_tokens: 4096,
+          temperature: 1.00, // Mengikuti saran resmi
+          top_p: 0.95,       // Mengikuti saran resmi
+          stream: false,
+          // 👈 FITUR "THINKING" DARI CONTOH RESMI
+          chat_template_kwargs: { "enable_thinking": true } 
         })
       });
       
       const dataSuper = await resSuper.json();
-      let jawabanSuper = "";
-
-      if (!resSuper.ok) {
-        jawabanSuper = `⚠️ Error NVIDIA API: ${JSON.stringify(dataSuper)}`;
-        console.error("NVIDIA API Error:", dataSuper);
-      } else {
-        jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Gagal memproses (Data kosong).";
-        riwayatSuper.push({ role: "assistant", content: jawabanSuper });
-        await setRedis(`memori_super_${chatId}`, riwayatSuper);
-      }
+      let jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Gagal.";
       
-      // 👈 Judul balasan diubah agar kamu tahu ini sudah pakai AI yang baru
-      await kirimPesanTelegram(chatId, `[DiffusionGemma 26B]:\n\n${jawabanSuper}`);
+      await kirimPesanTelegram(chatId, `[DiffusionGemma Thinking]:\n\n${jawabanSuper}`);
+      
+      // Simpan ke memori
+      riwayatSuper.push({ role: "assistant", content: jawabanSuper });
+      await setRedis(`memori_super_${chatId}`, riwayatSuper);
     }
 
     // [E] AI VISION NANO (NVIDIA RESMI) DENGAN MEMORI
