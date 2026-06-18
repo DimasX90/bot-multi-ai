@@ -8,7 +8,7 @@ export const config = {
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY; // 👈 API NVIDIA RESMI
+const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY; 
 const CLIPDROP_API_KEY = process.env.CLIPDROP_API_KEY; 
 const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -92,7 +92,6 @@ export default async function handler(request) {
     let fileIdToDownload = null;
     let isImage = false;
 
-    // Ambil ukuran foto yang aman
     if (fotoMasuk) {
       const indexFoto = fotoMasuk.length > 1 ? 1 : 0; 
       fileIdToDownload = fotoMasuk[indexFoto].file_id;
@@ -140,7 +139,6 @@ export default async function handler(request) {
         imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
         
         if (aiPilihan === "gemini" || aiPilihan === "nano") {
-          // 👈 PERBAIKAN: Menggunakan Buffer agar gambar tidak korup/rusak
           base64Image = Buffer.from(imageBuffer).toString('base64');
         }
       }
@@ -148,7 +146,7 @@ export default async function handler(request) {
 
     // --- 4. EKSEKUSI AI ---
 
-    // [A] CLIPDROP
+    // [A] CLIPDROP (VERSI BERSIH DARI TARGET WIDTH)
     if (aiPilihan === "edit") {
       if (!isImage || !imageBuffer) {
         await kirimPesanTelegram(chatId, "📸 Sesi edit foto aktif! Kirim foto untuk saya perbagus.");
@@ -160,7 +158,7 @@ export default async function handler(request) {
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
       
-      // KEDUA BARIS TARGET WIDTH & HEIGHT YANG MEMBUAT ERROR SUDAH DIHAPUS
+      // PERHATIKAN: TIDAK ADA LAGI TARGET_WIDTH DI SINI
 
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
@@ -174,7 +172,7 @@ export default async function handler(request) {
       } else {
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Alasan dari Clipdrop:\n\n${errorData.substring(0, 50)}`);
+        await kirimPesanTelegram(chatId, `❌ Gagal mengedit.\n\nError: ${errorData.substring(0, 50)}`);
       }
     }
       
@@ -182,32 +180,24 @@ export default async function handler(request) {
     else if (aiPilihan === "gemini") {
       const pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis gambar ini dengan detail.";
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
-      
       let memoriMentah = await getRedis(`memori_gemini_${chatId}`) || [];
-      let formatGemini = memoriMentah.map(msg => ({
-          role: msg.role,
-          parts: [{ text: msg.content }]
-      }));
-
+      let formatGemini = memoriMentah.map(msg => ({ role: msg.role, parts: [{ text: msg.content }] }));
       let partsSaatIni = [{ text: pertanyaanClean }];
       if (base64Image) {
           partsSaatIni.push({ "inline_data": { "mime_type": "image/jpeg", "data": base64Image } });
       }
       formatGemini.push({ role: "user", parts: partsSaatIni });
-
       const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini })
       });
       const resData = await resGemini.json();
       const jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Respon tidak dikenali.";
-      
       if (!jawaban.startsWith("⚠️")) {
           memoriMentah.push({ role: "user", content: pertanyaanClean });
           memoriMentah.push({ role: "model", content: jawaban });
           if (memoriMentah.length > 6) memoriMentah = memoriMentah.slice(-6); 
           await setRedis(`memori_gemini_${chatId}`, memoriMentah);
       }
-
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
     }
 
@@ -220,15 +210,12 @@ export default async function handler(request) {
         return new Response(JSON.stringify({ status: 'redirected' }), { status: 200 });
       } 
       await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
-      
       let riwayatChat = await getRedis(`memori_${chatId}`) || [];
       riwayatChat.push({ role: "user", content: pertanyaanClean });
       if (riwayatChat.length > 16) riwayatChat = riwayatChat.slice(-16);
-      
       const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat })});
       const groqData = await resGroq.json();
       const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses Groq.";
-      
       if (!jawabanGroq.startsWith("⚠️")) {
         riwayatChat.push({ role: "assistant", content: jawabanGroq });
         await setRedis(`memori_${chatId}`, riwayatChat);
@@ -240,27 +227,29 @@ export default async function handler(request) {
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ Nemotron Super sedang merangkai jawaban...");
-      
       let riwayatSuper = await getRedis(`memori_super_${chatId}`) || [];
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
       if (riwayatSuper.length > 16) riwayatSuper = riwayatSuper.slice(-16);
-
       const resSuper = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${NVIDIA_API_KEY}`
+          'Authorization': `Bearer ${NVIDIA_API_KEY}`,
+          'Accept': 'application/json'
         },
         body: JSON.stringify({ 
           model: "nvidia/nemotron-3-super-120b-a12b", 
           messages: riwayatSuper,
-          max_tokens: 1024
+          max_tokens: 1024,
+          temperature: 0.7,
+          top_p: 1.00,
+          frequency_penalty: 0.00,
+          presence_penalty: 0.00,
+          stream: false
         })
       });
-      
       const dataSuper = await resSuper.json();
       let jawabanSuper = "";
-
       if (!resSuper.ok) {
         jawabanSuper = `⚠️ Error NVIDIA API: ${JSON.stringify(dataSuper)}`;
         console.error("NVIDIA API Error:", dataSuper);
@@ -269,20 +258,15 @@ export default async function handler(request) {
         riwayatSuper.push({ role: "assistant", content: jawabanSuper });
         await setRedis(`memori_super_${chatId}`, riwayatSuper);
       }
-      
       await kirimPesanTelegram(chatId, `[Nemotron Super 120B]:\n\n${jawabanSuper}`);
     }
 
     // [E] AI VISION NANO (NVIDIA RESMI) DENGAN MEMORI
     else if (aiPilihan === "nano") {
       const pertanyaan = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
-      
-      // 1. Berikan respon instan ke Telegram agar Vercel tidak timeout
       await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang memproses gambar, mohon tunggu sebentar...");
-
-      // 2. Gunakan 'fetch' dengan timeout yang lebih pendek agar tidak menggantung
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // Batasi proses 20 detik
+      const timeoutId = setTimeout(() => controller.abort(), 20000); 
 
       try {
         let konten = [];
@@ -295,9 +279,9 @@ export default async function handler(request) {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
         body: JSON.stringify({ 
-          model: "meta/llama-3.2-11b-vision-instruct", // 👈 Model yang jauh lebih ringan & cepat
+          model: "meta/llama-3.2-11b-vision-instruct", 
           messages: [{ role: "user", content: konten }],
-          max_tokens: 500, // 👈 Tetap batasi token agar respon instan
+          max_tokens: 500, 
           temperature: 0.5
         })
       });
@@ -335,4 +319,5 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-}
+                                                                                      }
+                                              
