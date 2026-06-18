@@ -157,22 +157,12 @@ export default async function handler(request) {
 
       await kirimPesanTelegram(chatId, "⏳ AI sedang memproses fotomu...");
 
-      // Pastikan target adalah angka yang valid
-      const width = (targetW && targetW > 0) ? targetW : 2048;
-      const height = (targetH && targetH > 0) ? targetH : 2048;
-
       const formData = new FormData();
       formData.append('image_file', new Blob([imageBuffer], { type: 'image/jpeg' }), 'foto.jpg');
-      formData.append('target_width', width.toString());  
-      formData.append('target_height', height.toString()); 
 
-      // PENTING: Kita tidak perlu menyetel 'Content-Type' secara manual 
-      // karena browser/fetch akan mengaturnya secara otomatis saat menggunakan FormData
       const resClipdrop = await fetch('https://clipdrop-api.co/image-upscaling/v1/upscale', {
         method: 'POST',
-        headers: { 
-            'x-api-key': CLIPDROP_API_KEY 
-        },
+        headers: { 'x-api-key': CLIPDROP_API_KEY },
         body: formData
       });
 
@@ -182,7 +172,8 @@ export default async function handler(request) {
       } else {
         const errorData = await resClipdrop.text();
         console.error("Error Clipdrop:", errorData); 
-        await kirimPesanTelegram(chatId, `❌ Gagal mengedit. Pastikan API Key aktif.\nError: ${errorData.substring(0, 100)}`);
+        // Pesan error akan muncul lengkap tanpa dipotong
+        await kirimPesanTelegram(chatId, `❌ Gagal mengedit.\n\nDetail Error:\n${errorData}`);
       }
     }
       
