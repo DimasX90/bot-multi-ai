@@ -206,7 +206,16 @@ export default async function handler(request) {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini })
       });
       const resData = await resGemini.json();
-      const jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Respon tidak dikenali.";
+      
+      // --- SISTEM PELACAK ERROR BARU ---
+      let jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!jawaban) {
+         // Jika gagal, tampilkan pesan error asli dari server Google
+         jawaban = `⚠️ Respon tidak dikenali.\n\nAlasan dari Google:\n${JSON.stringify(resData).substring(0, 300)}`;
+      }
+      // ---------------------------------
+
       if (!jawaban.startsWith("⚠️")) {
           memoriMentah.push({ role: "user", content: pertanyaanClean });
           memoriMentah.push({ role: "model", content: jawaban });
