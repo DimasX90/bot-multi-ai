@@ -289,7 +289,7 @@ export default async function handler(request) {
             body: JSON.stringify({ 
               model: "meta/llama-3.2-11b-vision-instruct", 
               messages: [{ role: "user", content: konten }], 
-              max_tokens: 1024 
+              max_tokens: 800 
             })
           });
           
@@ -319,7 +319,7 @@ export default async function handler(request) {
             body: JSON.stringify({ 
               model: "meta/llama-3.2-11b-vision-instruct", 
               messages: riwayatNano, // Mengirim teks riwayat lengkap beserta konteks jawaban gambar sebelumnya
-              max_tokens: 1024 
+              max_tokens: 800 
             })
           });
           
