@@ -285,31 +285,25 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "🌐 Sedang berselancar di internet via Tavily...");
       const hasilInternet = await cariDiInternet(kueriPencarian);
 
-      await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Gemini...");
+      await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Groq (Llama 3.3)...");
       
-      // PROMPT BARU: Memaksa Gemini menyertakan link referensi di akhir teks jawaban
-      const instruksiRangkum = `Kamu adalah Asisten Riset Pintar. Tugasmu menjawab pertanyaan pengguna secara objektif berdasarkan data internet yang disediakan. 
+      const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Tugasmu menjawab pertanyaan pengguna secara objektif berdasarkan data internet yang disediakan. Jawab dengan sangat singkat, padat, terstruktur, dan langsung menyentuh inti jawaban. Jangan gunakan basa-basi pembuka. WAJIB: Di bagian paling bawah jawabanmu, buatkan bagian khusus bertuliskan '📌 Sumber Referensi:' lalu daftarkan semua judul website beserta URL/Link yang valid dari data internet di bawah ini agar pengguna bisa mengkliknya.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
 
-Jawab dengan sangat singkat, padat, terstruktur, dan langsung menyentuh inti jawaban. Jangan gunakan basa-basi pembuka. 
-
-WAJIB: Di bagian paling bawah jawabanmu, buatkan bagian khusus bertuliskan "📌 Sumber Referensi:" lalu daftarkan semua judul website beserta URL/Link yang valid dari data internet di bawah ini agar pengguna bisa mengkliknya.
-
-Pertanyaan: ${kueriPencarian}
-
-Data Internet:
-${hasilInternet}`;
-
-      const resGeminiSearch = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      const resGroqSearch = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: instruksiRangkum }] }]
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': 'Bearer ' + GROQ_API_KEY 
+        },
+        body: JSON.stringify({ 
+          model: "llama-3.3-70b-versatile", 
+          messages: [{ role: "user", content: instruksiRangkum }] 
         })
       });
-      const dataSearch = await resGeminiSearch.json();
-      const jawabanFinal = dataSearch.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Gagal merangkum hasil penelusuran.";
-
-      await kirimPesanTelegram(chatId, `[Perplexity Mode 🌐]:\n\n${jawabanFinal}`);
+      
+      const dataSearch = await resGroqSearch.json();
+      const jawabanFinal = dataSearch.choices?.[0]?.message?.content || "⚠️ Gagal merangkum hasil penelusuran dengan Groq.";
+      await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Groq]:\n\n" + jawabanFinal);
     }
       
     // [C] GROQ
