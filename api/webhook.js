@@ -287,7 +287,7 @@ export default async function handler(request) {
 
       await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Groq (Llama 3.3)...");
       
-      const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Tugasmu menjawab pertanyaan pengguna secara objektif berdasarkan data internet yang disediakan. Jawab dengan sangat singkat, padat, terstruktur, dan langsung menyentuh inti jawaban. Jangan gunakan basa-basi pembuka. WAJIB: Di bagian paling bawah jawabanmu, buatkan bagian khusus bertuliskan '📌 Sumber Referensi:' lalu daftarkan semua judul website beserta URL/Link yang valid dari data internet di bawah ini agar pengguna bisa mengkliknya.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
+      const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Tugasmu menjawab pertanyaan pengguna secara objektif berdasarkan data internet yang disediakan. Jawab secara terstruktur menggunakan poin-poin penting, pastikan data penting (seperti angka, nominal, atau nama kebijakan) TIDAK DIHAPUS. Jangan gunakan basa-basi pembuka. WAJIB: Di bagian paling bawah jawabanmu, buatkan bagian khusus bertuliskan '📌 Sumber Referensi:' lalu daftarkan semua judul website beserta URL/Link yang valid dari data internet di bawah ini agar pengguna bisa mengkliknya.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
 
       const resGroqSearch = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: 'POST',
