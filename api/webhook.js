@@ -269,8 +269,17 @@ export default async function handler(request) {
 
       await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Gemini...");
       
-      // Prompt yang dirancang agar Gemini memproses hasil pencarian secara kilat & netral
-      const instruksiRangkum = `Kamu adalah Asisten Riset Pintar. Tugasmu menjawab pertanyaan pengguna secara objektif berdasarkan data internet yang disediakan. Jawab dengan sangat singkat, padat, terstruktur, dan langsung menyentuh inti jawaban. Jangan gunakan basa-basi pembuka.\n\nPertanyaan: ${kueriPencarian}\n\nData Internet:\n${hasilInternet}`;
+      // PROMPT BARU: Memaksa Gemini menyertakan link referensi di akhir teks jawaban
+      const instruksiRangkum = `Kamu adalah Asisten Riset Pintar. Tugasmu menjawab pertanyaan pengguna secara objektif berdasarkan data internet yang disediakan. 
+
+Jawab dengan sangat singkat, padat, terstruktur, dan langsung menyentuh inti jawaban. Jangan gunakan basa-basi pembuka. 
+
+WAJIB: Di bagian paling bawah jawabanmu, buatkan bagian khusus bertuliskan "📌 Sumber Referensi:" lalu daftarkan semua judul website beserta URL/Link yang valid dari data internet di bawah ini agar pengguna bisa mengkliknya.
+
+Pertanyaan: ${kueriPencarian}
+
+Data Internet:
+${hasilInternet}`;
 
       const resGeminiSearch = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
@@ -284,7 +293,7 @@ export default async function handler(request) {
 
       await kirimPesanTelegram(chatId, `[Perplexity Mode 🌐]:\n\n${jawabanFinal}`);
     }
-
+      
     // [C] GROQ
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
