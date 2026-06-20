@@ -149,27 +149,7 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
     }
 
-    // ==================== LOGIKA PERINTAH UTAMA ====================
-
-    // 1. JIKA PENGGUNA MENGIRIM /START (RESET SESI & TAMPILKAN MENU)
-    if (pesanLowercase === "/start") {
-      await setRedis(`sesi_${chatId}`, ""); // Kosongkan sesi aktif sebelumnya agar bersih
-      const teksSambut = `✨ *Selamat Datang di Multiple AI Response Bot!* ✨\n\n` +
-                         `Silakan pilih atau panggil AI yang ingin kamu gunakan dengan cara mengetik kodenya:\n\n` +
-                         `🌐 *@search [kueri]* -> Mode Perplexity (Browsing internet realtime)\n` +
-                         `🧠 *@gemini [pesan/foto]* -> Analisis teks & gambar tingkat lanjut\n` +
-                         `⚡ *@groq [pesan]* -> Jawaban super cepat via Llama 3.3\n` +
-                         `🔮 *@super [pesan]* -> Mode penalaran mendalam (DiffusionGemma)\n` +
-                         `📸 *@nano [foto]* -> NVIDIA Vision khusus pembaca gambar\n` +
-                         `🎨 *@gambar [prompt]* -> Cari foto berkualitas tinggi via Pexels\n` +
-                         `✨ *@edit [foto]* -> Perbagus fotomu menjadi kualitas HD\n\n` +
-                         `*Contoh:* \\`@search berita bola hari ini\\` atau tinggal kirim foto lalu tag \\`@gemini\\``;
-                         
-      await kirimPesanTelegram(chatId, teksSambut);
-      return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
-    }
-
-    // 2. JIKA BUKAN /START, DETEKSI PICUAN SESI AI SEPERTI BIASA
+    // Pemicu Deteksi Sesi AI (Termasuk Fitur Baru @search)
     if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) {
       await setRedis(`sesi_${chatId}`, "search");
     } else if (pesanLowercase.includes("@gemini") || (isImage && pesanUser === "" && !(await getRedis(`sesi_${chatId}`)) === "edit")) {
@@ -189,7 +169,7 @@ export default async function handler(request) {
     let aiPilihan = await getRedis(`sesi_${chatId}`);
 
     if (!aiPilihan) {
-      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@edit\` (kirim foto)");
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: `@search berita terkini`, `@gemini halo`, `@groq kode`, atau `@edit` (kirim foto)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
@@ -276,11 +256,11 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
     }
 
-    // [B-NEW] MODE PERPLEXITY (TAVILY BASIC + GEMINI COMPRESSION + LINKS)
+    // [B-NEW] MODE PERPLEXITY (TAVILY BASIC + GEMINI COMPRESSION)
     else if (aiPilihan === "search") {
       const kueriPencarian = pesanUser.replace(/@search|\/search/gi, '').trim();
       if (!kueriPencarian) {
-        await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian. Contoh: \`@search berita sepak bola hari ini\`");
+        await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian. Contoh: `@search berita sepak bola hari ini`");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
 
@@ -448,4 +428,4 @@ ${hasilInternet}`;
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-}
+            }
