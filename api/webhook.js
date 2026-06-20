@@ -1,5 +1,3 @@
-// api/webhook.js
-
 export const config = {
   runtime: 'edge',
 };
@@ -10,6 +8,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY; 
 const CLIPDROP_API_KEY = process.env.CLIPDROP_API_KEY; 
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY; // Tambahkan API Key Tavily di Vercel Dashboard
 const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 // =======================================================
@@ -37,6 +36,27 @@ async function incrRedis(key) {
   });
   const data = await res.json();
   return data.result;
+}
+
+// Fungsi Helper untuk melakukan Browsing via Tavily API (Maksimal 3 Hasil agar Ringan)
+async function cariDiInternet(query) {
+  try {
+    const response = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: TAVILY_API_KEY,
+        query: query,
+        max_results: 3,
+        search_depth: "basic"
+      })
+    });
+    const data = await response.json();
+    if (!data.results || data.results.length === 0) return "Tidak ditemukan informasi relevan di internet.";
+    return data.results.map(res => `Sumber: ${res.title} (${res.url})\nInformasi: ${res.content}`).join("\n\n");
+  } catch (err) {
+    return "Gagal melakukan pencarian internet karena gangguan teknis.";
+  }
 }
 
 // SIFAT: Sistem Pengiriman 3 Lapis Bawaan (Stabil & Otomatis Salin Kode)
@@ -129,7 +149,10 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
     }
 
-    if (pesanLowercase.includes("@gemini") || (isImage && pesanUser === "" && !(await getRedis(`sesi_${chatId}`)) === "edit")) {
+    // Pemicu Deteksi Sesi AI (Termasuk Fitur Baru @search)
+    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) {
+      await setRedis(`sesi_${chatId}`, "search");
+    } else if (pesanLowercase.includes("@gemini") || (isImage && pesanUser === "" && !(await getRedis(`sesi_${chatId}`)) === "edit")) {
       await setRedis(`sesi_${chatId}`, "gemini");
     } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
       await setRedis(`sesi_${chatId}`, "groq");
@@ -146,7 +169,7 @@ export default async function handler(request) {
     let aiPilihan = await getRedis(`sesi_${chatId}`);
 
     if (!aiPilihan) {
-      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: `@groq halo`, `@super kode`, `@nano` (kirim gambar), atau `@edit` (kirim foto)");
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: `@search berita terkini`, `@gemini halo`, `@groq kode`, atau `@edit` (kirim foto)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
@@ -193,19 +216,20 @@ export default async function handler(request) {
       }
     }
       
-    // [B] GEMINI
+    // [B] GEMINI (DENGAN RECOIL PROTECTOR PENJELASAN SINGKAT AUTOMATIS)
     else if (aiPilihan === "gemini") {
-      const pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis.";
+      let pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis.";
+      // Cegah timeout Vercel dengan menyuntikkan instruksi hemat token secara tersembunyi
+      pertanyaanClean += " (Berikan jawaban yang singkat, padat, langsung ke inti langkah pengerjaan/rumusnya saja, hindari teks pembuka atau penjelasan teori yang terlalu panjang agar respons cepat).";
+      
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
       
       let memoriMentah = [];
       
-      // JIKA PENGGUNA MENGIRIM GAMBAR BARU, KOSONGKAN MEMORI (RESET)
       if (base64Image) {
-         await setRedis(`memori_gemini_${chatId}`, []); // Hapus memori di Redis
-         memoriMentah = []; // Pastikan variabel memori saat ini kosong
+         await setRedis(`memori_gemini_${chatId}`, []); 
+         memoriMentah = []; 
       } else {
-         // Jika HANYA CHAT TEKS biasa, ambil memori seperti biasa
          memoriMentah = await getRedis(`memori_gemini_${chatId}`) || [];
       }
 
@@ -230,6 +254,35 @@ export default async function handler(request) {
           await setRedis(`memori_gemini_${chatId}`, memoriMentah.slice(-6));
       }
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
+    }
+
+    // [B-NEW] MODE PERPLEXITY (TAVILY BASIC + GEMINI COMPRESSION)
+    else if (aiPilihan === "search") {
+      const kueriPencarian = pesanUser.replace(/@search|\/search/gi, '').trim();
+      if (!kueriPencarian) {
+        await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian. Contoh: `@search berita sepak bola hari ini`");
+        return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+      }
+
+      await kirimPesanTelegram(chatId, "🌐 Sedang berselancar di internet via Tavily...");
+      const hasilInternet = await cariDiInternet(kueriPencarian);
+
+      await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Gemini...");
+      
+      // Prompt yang dirancang agar Gemini memproses hasil pencarian secara kilat & netral
+      const instruksiRangkum = `Kamu adalah Asisten Riset Pintar. Tugasmu menjawab pertanyaan pengguna secara objektif berdasarkan data internet yang disediakan. Jawab dengan sangat singkat, padat, terstruktur, dan langsung menyentuh inti jawaban. Jangan gunakan basa-basi pembuka.\n\nPertanyaan: ${kueriPencarian}\n\nData Internet:\n${hasilInternet}`;
+
+      const resGeminiSearch = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: instruksiRangkum }] }]
+        })
+      });
+      const dataSearch = await resGeminiSearch.json();
+      const jawabanFinal = dataSearch.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Gagal merangkum hasil penelusuran.";
+
+      await kirimPesanTelegram(chatId, `[Perplexity Mode 🌐]:\n\n${jawabanFinal}`);
     }
 
     // [C] GROQ
@@ -285,14 +338,13 @@ export default async function handler(request) {
       }
     }
 
-    // [E] AI VISION NANO DENGAN INGATAN TEKS CERDAS (MAKSIMAL 8 INGINATAN)
+    // [E] AI VISION NANO
     else if (aiPilihan === "nano") {
       const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
       await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang menganalisis pesan...");
       
       let riwayatNano = [];
 
-      // KONDISI A: PENGGUNA MENGIRIM GAMBAR BARU
       if (isImage && base64Image) {
         let konten = [
           { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
@@ -314,7 +366,6 @@ export default async function handler(request) {
           const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
           
           if (!jawaban.startsWith("⚠️")) {
-            // Reset & simpan ingatan baru berupa teks saja agar tidak membebani database
             riwayatNano.push({ role: "user", content: `[Melihat Gambar]: ${pertanyaanClean}` });
             riwayatNano.push({ role: "assistant", content: jawaban });
             await setRedis(`memori_nano_${chatId}`, riwayatNano);
@@ -324,7 +375,6 @@ export default async function handler(request) {
           await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan atau timeout saat membaca gambar.");
         }
       } 
-      // KONDISI B: PENGGUNA BERTANYA LEWAT TEKS (FOLLOW-UP OBROLAN GAMBAR)
       else {
         riwayatNano = await getRedis(`memori_nano_${chatId}`) || [];
         riwayatNano.push({ role: "user", content: pertanyaanClean });
@@ -335,7 +385,7 @@ export default async function handler(request) {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
             body: JSON.stringify({ 
               model: "meta/llama-3.2-11b-vision-instruct", 
-              messages: riwayatNano, // Mengirim teks riwayat lengkap beserta konteks jawaban gambar sebelumnya
+              messages: riwayatNano, 
               max_tokens: 700 
             })
           });
@@ -345,7 +395,6 @@ export default async function handler(request) {
           
           if (!jawaban.startsWith("⚠️")) {
             riwayatNano.push({ role: "assistant", content: jawaban });
-            // Kunci maksimal 8 ingatan (4 dari pengguna, 4 respon AI) sesuai permintaanmu
             if (riwayatNano.length > 8) riwayatNano = riwayatNano.slice(-8);
             await setRedis(`memori_nano_${chatId}`, riwayatNano);
           }
@@ -370,5 +419,4 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-  }
-        
+            }
