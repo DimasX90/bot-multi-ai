@@ -197,24 +197,32 @@ export default async function handler(request) {
     else if (aiPilihan === "gemini") {
       const pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis.";
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
-      let memoriMentah = await getRedis(`memori_gemini_${chatId}`) || [];
+      
+      let memoriMentah = [];
+      
+      // JIKA PENGGUNA MENGIRIM GAMBAR BARU, KOSONGKAN MEMORI (RESET)
+      if (base64Image) {
+         await setRedis(`memori_gemini_${chatId}`, []); // Hapus memori di Redis
+         memoriMentah = []; // Pastikan variabel memori saat ini kosong
+      } else {
+         // Jika HANYA CHAT TEKS biasa, ambil memori seperti biasa
+         memoriMentah = await getRedis(`memori_gemini_${chatId}`) || [];
+      }
+
       let formatGemini = memoriMentah.map(msg => ({ role: msg.role, parts: [{ text: msg.content }] }));
       let partsSaatIni = [{ text: pertanyaanClean }];
       if (base64Image) partsSaatIni.push({ "inline_data": { "mime_type": "image/jpeg", "data": base64Image } });
       formatGemini.push({ role: "user", parts: partsSaatIni });
+      
       const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini })
       });
       const resData = await resGemini.json();
       
-      // --- SISTEM PELACAK ERROR BARU ---
       let jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-      
       if (!jawaban) {
-         // Jika gagal, tampilkan pesan error asli dari server Google
          jawaban = `⚠️ Respon tidak dikenali.\n\nAlasan dari Google:\n${JSON.stringify(resData).substring(0, 300)}`;
       }
-      // ---------------------------------
 
       if (!jawaban.startsWith("⚠️")) {
           memoriMentah.push({ role: "user", content: pertanyaanClean });
