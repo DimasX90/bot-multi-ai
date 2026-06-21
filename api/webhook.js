@@ -172,7 +172,7 @@ export default async function handler(request) {
     let isImage = false;
 
     if (fotoMasuk) {
-      const indexFoto = fotoMasuk.length > 1 ? 1 : 0; 
+      const indexFoto = fotoMasuk.length -1; 
       fileIdToDownload = fotoMasuk[indexFoto].file_id;
       isImage = true;
     } 
