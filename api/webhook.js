@@ -441,17 +441,15 @@ export default async function handler(request) {
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
-      await kirimPesanTelegram(chatId, "⏳ Groq Llama 4 sedang menganalisis dan menyusun tugasmu ke bentuk dokumen...");
+      await kirimPesanTelegram(chatId, "⏳ Groq Llama 4 sedang menganalisis tugasmu...");
       
-      // 🔥 PERUBAHAN: Memaksa AI menulis dengan tag HTML agar indah saat dibuka di Chrome
-      const instruksiPakar = "Kamu adalah pakar pendidikan dan asisten guru matematika & sains yang sangat cerdas. Tugasmu membantu membuatkan rangkuman, jawaban soal, atau materi tugas secara LENGKAP, MENDALAM, dan DETAIL. Jika menjawab soal hitungan, jabarkan rumus, bagian 'Diketahui', 'Ditanyakan', beserta jalannya baris demi baris secara urut.\n\n" +
-                             "WAJIB JAWAB MENGGUNAKAN FORMAT HTML (Gunakan <h1> atau <h2> untuk judul/bab, <p> untuk paragraf, <b> untuk teks tebal, <ul> dan <li> untuk daftar poin). JANGAN gunakan simbol markdown seperti #, ##, atau **. Pastikan outputnya berupa struktur HTML yang rapi agar siap dibaca di browser.\n\n";
+      const instruksiPakar = "Kamu adalah pakar pendidikan dan asisten guru matematika & sains yang sangat cerdas. Tugasmu membantu membuatkan rangkuman, jawaban soal, atau materi tugas secara LENGKAP, MENDALAM, dan DETAIL. Jika menjawab soal hitungan, jabarkan rumus, bagian 'Diketahui', 'Ditanyakan', beserta jalannya baris demi baris secara urut.\n\n";
 
       const modelTugas = "meta-llama/llama-4-scout-17b-16e-instruct"; 
       let pesanKirim = [];
 
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Tolong baca, selesaikan, dan jabarkan soal matematika/sains yang ada pada gambar ini secara mendalam baris demi baris menggunakan format HTML.");
+        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Tolong baca, selesaikan, dan jabarkan soal matematika/sains yang ada pada gambar ini secara mendalam baris demi baris.");
         
         pesanKirim.push({
           role: "user",
@@ -462,7 +460,7 @@ export default async function handler(request) {
         });
       } else {
         if (!pertanyaanClean) {
-          await kirimPesanTelegram(chatId, "📝 *Sesi Dokumen Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.\nContoh: `@tugas buatkan rangkuman sejarah`");
+          await kirimPesanTelegram(chatId, "📝 *Sesi Dokumen Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
           return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
         }
         pesanKirim.push({ role: "user", content: instruksiPakar + pertanyaanClean });
@@ -483,9 +481,9 @@ export default async function handler(request) {
       const hasilTugas = groqData.choices?.[0]?.message?.content;
       
       if (hasilTugas) {
-        await kirimPesanTelegram(chatId, "✅ Dokumen analisis tugas berhasil dicetak!");
-        const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
-        await kirimDokumenHtmlTelegram(chatId, hasilTugas, namaFileHasil, `📄 Hasil analisis dari Groq Llama 4`);
+        // TES KIRIM SEBAGAI TEKS BIASA
+        const pesanAman = hasilTugas.length > 4000 ? hasilTugas.substring(0, 4000) + "...\n[Terpotong]" : hasilTugas;
+        await kirimPesanTelegram(chatId, `✅ *Berhasil! Ini jawaban AI:*\n\n${pesanAman}`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
