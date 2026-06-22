@@ -456,13 +456,14 @@ export default async function handler(request) {
       
       await kirimPesanTelegram(chatId, "⏳ Groq Llama 4 sedang menganalisis tugasmu...");
       
-      const instruksiPakar = "Kamu adalah pakar pendidikan dan asisten guru matematika & sains yang sangat cerdas. Tugasmu membantu membuatkan rangkuman, jawaban soal, atau materi tugas secara LENGKAP, MENDALAM, dan DETAIL. Jika menjawab soal hitungan, jabarkan rumus, bagian 'Diketahui', 'Ditanyakan', beserta jalannya baris demi baris secara urut.\n\n";
+      // Minta AI menulis dengan tag HTML murni agar rapi di browser
+      const instruksiPakar = "Kamu adalah pakar pendidikan dan asisten guru matematika & sains yang sangat cerdas. Tugasmu membantu membuatkan rangkuman, jawaban soal, atau materi tugas secara LENGKAP, MENDALAM, dan DETAIL. Jika menjawab soal hitungan, jabarkan rumus, bagian 'Diketahui', 'Ditanyakan', beserta jalannya baris demi baris secara urut.\n\nWAJIB JAWAB MENGGUNAKAN FORMAT HTML (Gunakan <h1>, <h2>, <p>, <b>, <ul>, <li>, dll). JANGAN gunakan simbol markdown seperti # atau **. Pastikan outputnya rapi dan siap dibaca di browser.\n\n";
 
       const modelTugas = "meta-llama/llama-4-scout-17b-16e-instruct"; 
       let pesanKirim = [];
 
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Tolong baca, selesaikan, dan jabarkan soal matematika/sains yang ada pada gambar ini secara mendalam baris demi baris.");
+        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Tolong baca, selesaikan, dan jabarkan soal matematika/sains yang ada pada gambar ini secara mendalam baris demi baris menggunakan format HTML.");
         
         pesanKirim.push({
           role: "user",
@@ -494,21 +495,20 @@ export default async function handler(request) {
       const hasilTugas = groqData.choices?.[0]?.message?.content;
       
       if (hasilTugas) {
-        // TES KIRIM SEBAGAI TEKS BIASA
-        const pesanAman = hasilTugas.length > 4000 ? hasilTugas.substring(0, 4000) + "...\n[Terpotong]" : hasilTugas;
-        await kirimPesanTelegram(chatId, `✅ *Berhasil! Ini jawaban AI:*\n\n${pesanAman}`);
+        // PERUBAHAN: Memanggil fungsi cetak HTML
+        await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
+        const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
+        await kirimDokumenHtmlTelegram(chatId, hasilTugas, namaFileHasil, `📄 Hasil analisis dari Groq Llama 4`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    } 
+    } // <-- Ini adalah penutup dari blok else if (aiPilihan === "tugas")
 
-  } catch (error) { 
-    // BLOK PELACAK ERROR
+  } catch (error) {
     console.error("Sistem Utama Crash:", error);
     await kirimPesanTelegram(chatId, "❌ SISTEM CRASH: " + error.message);
   }
 
-  // Memberikan respon OK ke Telegram agar bot tidak looping
   return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
 }
