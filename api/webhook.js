@@ -234,12 +234,13 @@ export default async function handler(request) {
       if (resFile.ok) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
         imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
-        if (aiPilihan === "gemini" || aiPilihan === "nano") {
+        // PERUBAHANNYA ADA DI BARIS BAWAH INI (Tambahkan: || aiPilihan === "tugas")
+        if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "tugas") {
           base64Image = Buffer.from(imageBuffer).toString('base64');
         }
       }
     }
-
+    
     if (aiPilihan === "edit") {
       if (!isImage || !imageBuffer) {
         await kirimPesanTelegram(chatId, "📸 *Sesi AI Perbaikan Foto Aktif!*\nKirimkan fotomu lalu tambahkan salah satu kata kunci ini di caption:\n\n👉 *terang*, *tajam*, *warna*, *bersih*, *bersih kontras*, *semua*, atau *semua kontras*\n\n_(Kosongkan caption selain tag @edit untuk auto-poles alami)_");
