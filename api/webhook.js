@@ -485,7 +485,7 @@ export default async function handler(request) {
         body: JSON.stringify({ 
           model: modelTugas, 
           messages: pesanKirim,
-          max_completion_tokens: 2048, 
+          max_completion_tokens: 4096, 
           temperature: 0.4
         })
       });
