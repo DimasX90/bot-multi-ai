@@ -494,20 +494,51 @@ export default async function handler(request) {
       const hasilTugas = groqData.choices?.[0]?.message?.content;
       
       if (hasilTugas) {
-        // PERUBAHAN: Memanggil fungsi cetak HTML
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
-        await kirimDokumenHtmlTelegram(chatId, hasilTugas, namaFileHasil, `📄 Hasil analisis dari Groq Llama 4`);
+        
+        // 🔥 TAMBAHAN BARU: Membungkus teks AI dengan desain CSS agar tulisannya besar, rapi, dan responsif di HP!
+        const desainHtmlUtuh = `
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Kunci Jawaban & Pembahasan</title>
+            <style>
+                /* Pengaturan gaya teks dan ukuran halaman */
+                body { 
+                    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                    line-height: 1.6; 
+                    padding: 20px; 
+                    color: #222; 
+                    max-width: 800px; 
+                    margin: 0 auto; 
+                    font-size: 16px; /* Ukuran font standar yang enak dibaca */
+                }
+                h3 { 
+                    color: #2c3e50; 
+                    border-bottom: 2px solid #3498db; 
+                    padding-bottom: 8px; 
+                    margin-top: 30px; 
+                }
+                ul { padding-left: 20px; }
+                li { margin-bottom: 5px; }
+                p { margin-bottom: 12px; }
+                hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
+                /* Efek stabilo hijau untuk jawaban akhir agar menonjol */
+                b { color: #000; }
+            </style>
+        </head>
+        <body>
+            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
+            ${hasilTugas}
+        </body>
+        </html>
+        `;
+
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Groq Llama 4`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    } // <-- Ini adalah penutup dari blok else if (aiPilihan === "tugas")
-
-  } catch (error) {
-    console.error("Sistem Utama Crash:", error);
-    await kirimPesanTelegram(chatId, "❌ SISTEM CRASH: " + error.message);
-  }
-
-  return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
-}
