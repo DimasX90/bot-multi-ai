@@ -434,10 +434,64 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
+    // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO VIA GROQ LLAMA VISION)
+    else if (aiPilihan === "tugas") {
+      const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
+      
+      await kirimPesanTelegram(chatId, "⏳ Groq Llama sedang menganalisis dan menyusun tugasmu ke bentuk dokumen...");
+      
+      let modelTugas = "llama-3.3-70b-versatile"; // Model bawaan jika cuma kirim teks
+      let pesanKirim = [
+        { 
+          role: "system", 
+          content: "Kamu adalah pakar pendidikan dan asisten guru matematika & sains yang sangat cerdas. Tugasmu membantu membuatkan rangkuman, jawaban soal, esai, atau materi tugas sekolah secara LENGKAP, MENDALAM, KOMPREHENSIF, dan sangat DETAIL. Jika menjawab soal hitungan (matematika/fisika), jabarkan rumus, bagian 'Diketahui', 'Ditanyakan', beserta jalannya baris demi baris secara urut dan jelas agar mudah dipahami siswa. Gunakan simbol # untuk Judul Utama, ## untuk Sub-Bab, dan ### untuk poin kecil." 
+        }
+      ];
+
+      // Trik Cerdas: Jika sistem mendeteksi ada foto masuk, alihkan ke Llama Vision Groq!
+      if (base64Image) {
+        modelTugas = "llama-3.2-11b-vision-preview"; 
+        pesanKirim.push({
+          role: "user",
+          content: [
+            { type: "text", text: pertanyaanClean || "Tolong baca, selesaikan, dan jabarkan soal matematika/sains yang ada pada gambar ini secara mendalam baris demi baris." },
+            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+          ]
+        });
+      } else {
+        // Jika tidak ada foto dan teksnya kosong, beri peringatan
+        if (!pertanyaanClean) {
+          await kirimPesanTelegram(chatId, "📝 *Sesi Dokumen Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.\nContoh: `@tugas buatkan rangkuman sejarah`");
+          return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+        }
+        pesanKirim.push({ role: "user", content: pertanyaanClean });
+      }
+      
+      const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, 
+        body: JSON.stringify({ 
+          model: modelTugas, 
+          messages: pesanKirim
+        })
+      });
+      
+      const groqData = await resGroqTugas.json();
+      const hasilTugas = groqData.choices?.[0]?.message?.content || "⚠️ Gagal membuat tugas.";
+      
+      if (!hasilTugas.startsWith("⚠️")) {
+        await kirimPesanTelegram(chatId, "✅ Dokumen analisis tugas berhasil dicetak!");
+        // Jika pakai foto nama filenya beda, jika teks beda
+        const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
+        await kirimDokumenHtmlTelegram(chatId, hasilTugas, namaFileHasil, `📄 Hasil analisis dari Groq Llama`);
+      } else {
+        await kirimPesanTelegram(chatId, "❌ Terjadi gangguan server saat membuat berkas.");
+      }
+    }
+
     return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
   } catch (error) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-        }
-          
+}
