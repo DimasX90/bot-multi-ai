@@ -443,21 +443,23 @@ export default async function handler(request) {
       
       await kirimPesanTelegram(chatId, "⏳ Groq Llama sedang menganalisis dan menyusun tugasmu ke bentuk dokumen...");
       
-      let modelTugas = "llama-3.3-70b-versatile"; // Model bawaan jika cuma kirim teks
-      let pesanKirim = [
-        { 
-          role: "system", 
-          content: "Kamu adalah pakar pendidikan dan asisten guru matematika & sains yang sangat cerdas. Tugasmu membantu membuatkan rangkuman, jawaban soal, esai, atau materi tugas sekolah secara LENGKAP, MENDALAM, KOMPREHENSIF, dan sangat DETAIL. Jika menjawab soal hitungan (matematika/fisika), jabarkan rumus, bagian 'Diketahui', 'Ditanyakan', beserta jalannya baris demi baris secara urut dan jelas agar mudah dipahami siswa. Gunakan simbol # untuk Judul Utama, ## untuk Sub-Bab, dan ### untuk poin kecil." 
-        }
-      ];
+      // Instruksi kita simpan di dalam variabel (tidak langsung dikirim sebagai role "system")
+      const instruksiPakar = "Kamu adalah pakar pendidikan dan asisten guru matematika & sains yang sangat cerdas. Tugasmu membantu membuatkan rangkuman, jawaban soal, esai, atau materi tugas sekolah secara LENGKAP, MENDALAM, KOMPREHENSIF, dan sangat DETAIL. Jika menjawab soal hitungan (matematika/fisika), jabarkan rumus, bagian 'Diketahui', 'Ditanyakan', beserta jalannya baris demi baris secara urut dan jelas agar mudah dipahami siswa. Gunakan simbol # untuk Judul Utama, ## untuk Sub-Bab, dan ### untuk poin kecil.\n\n";
+
+      let modelTugas = "llama-3.3-70b-versatile"; 
+      let pesanKirim = [];
 
       // Trik Cerdas: Jika sistem mendeteksi ada foto masuk, alihkan ke Llama Vision Groq!
       if (base64Image) {
         modelTugas = "llama-3.2-11b-vision-preview"; 
+        
+        // KARENA GROQ VISION MENOLAK "SYSTEM", INSTRUKSI KITA GABUNG LANGSUNG KE TEKS USER
+        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Tolong baca, selesaikan, dan jabarkan soal matematika/sains yang ada pada gambar ini secara mendalam baris demi baris.");
+        
         pesanKirim.push({
           role: "user",
           content: [
-            { type: "text", text: pertanyaanClean || "Tolong baca, selesaikan, dan jabarkan soal matematika/sains yang ada pada gambar ini secara mendalam baris demi baris." },
+            { type: "text", text: teksPrompt },
             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
           ]
         });
@@ -467,6 +469,9 @@ export default async function handler(request) {
           await kirimPesanTelegram(chatId, "📝 *Sesi Dokumen Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.\nContoh: `@tugas buatkan rangkuman sejarah`");
           return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
         }
+        
+        // Jika teks biasa, AI Llama 3.3 biasa masih mengizinkan role "system"
+        pesanKirim.push({ role: "system", content: instruksiPakar });
         pesanKirim.push({ role: "user", content: pertanyaanClean });
       }
       
@@ -484,10 +489,11 @@ export default async function handler(request) {
       
       if (!hasilTugas.startsWith("⚠️")) {
         await kirimPesanTelegram(chatId, "✅ Dokumen analisis tugas berhasil dicetak!");
-        // Jika pakai foto nama filenya beda, jika teks beda
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         await kirimDokumenHtmlTelegram(chatId, hasilTugas, namaFileHasil, `📄 Hasil analisis dari Groq Llama`);
       } else {
+        // Menambahkan catatan error di log Vercel agar mudah dilacak jika terjadi masalah lain
+        console.error("Data Error Groq:", groqData);
         await kirimPesanTelegram(chatId, "❌ Terjadi gangguan server saat membuat berkas.");
       }
     }
