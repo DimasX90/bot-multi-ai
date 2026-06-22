@@ -196,6 +196,7 @@ export default async function handler(request) {
                          `📸 *@nano [foto]* -> NVIDIA Vision khusus pembaca gambar\n` +
                          `🎨 *@gambar [prompt]* -> Cari foto berkualitas tinggi via Pexels\n` +
                          `✨ *@edit [foto]* -> Perbagus foto dengan AI Racikan Kustom\n` +
+                         `📝 *@tugas [soal/foto]* -> Asisten cerdas tugas sekolah & bedah matematika (Cetak Dokumen)\n\n` +
                          `  _(Efek: terang, tajam, warna, bersih, bersih kontras, semua, semua kontras)_\n\n` +
                          `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@edit semua\``;
                          
