@@ -477,13 +477,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
-  } catch (error) {
-    console.error("Global Error:", error);
-    return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
-  }
-}
-  // [G] MODE TUGAS SEKOLAH (FORMAT DOKUMEN CETAK GOOGLE DOCS / PDF VIA GROQ)
+    // [G] MODE TUGAS SEKOLAH (FORMAT DOKUMEN CETAK GOOGLE DOCS / PDF VIA GROQ) - POSISINYA DI SINI
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       if (!pertanyaanClean) {
@@ -519,3 +513,10 @@ export default async function handler(request) {
         await kirimPesanTelegram(chatId, "❌ Terjadi gangguan server saat membuat berkas.");
       }
     }
+
+    return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+  } catch (error) {
+    console.error("Global Error:", error);
+    return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
+  }
+}
