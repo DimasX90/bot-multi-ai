@@ -217,6 +217,8 @@ export default async function handler(request) {
       await setRedis(`sesi_${chatId}`, "gambar");
     } else if (pesanLowercase.includes("@edit")) {
       await setRedis(`sesi_${chatId}`, "edit");
+    } else if (pesanLowercase.includes("@tugas")) {     
+      await setRedis(`sesi_${chatId}`, "tugas");
     }
 
     let aiPilihan = await getRedis(`sesi_${chatId}`);
