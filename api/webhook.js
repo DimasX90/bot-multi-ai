@@ -457,12 +457,13 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "⏳ Groq Llama 4 sedang menganalisis tugasmu...");
       
       // Minta AI menulis dengan tag HTML murni agar rapi di browser
-      const instruksiPakar = "Kamu adalah guru matematika dan sains yang jenius. Baca seluruh gambar dengan teliti dari atas ke bawah. Kerjakan SEMUA soal yang ada, baik itu Bagian A (Pilihan Ganda) maupun Bagian B (Essay). Tuliskan 'Diketahui' dan 'Ditanya' secara singkat dan padat. Berikan kalimat penjelasan singkat yang mudah dipahami sebelum memasukkan rumus, agar siswa mengerti alur berpikirnya. Langsung tuliskan rumus dan angka penyelesaiannya langkah demi langkah secara singkat agar seluruh soal bisa dijawab tanpa terpotong.\n\nWAJIB JAWAB MENGGUNAKAN FORMAT HTML (Gunakan <h3> untuk nomor soal, <p> untuk teks/rumus, <b> untuk hasil akhir). JANGAN gunakan simbol markdown seperti # atau **. JANGAN gunakan format LaTeX atau simbol dolar ($). Tulislah rumus dengan teks biasa (contoh: x^2 untuk pangkat, akar(x) untuk akar).\n\n";
+      const instruksiPakar = "Kamu adalah guru matematika dan sains yang jenius. PENTING: Baca seluruh gambar dari atas ke bawah. Kerjakan SEMUA soal tanpa terkecuali. JANGAN berhenti sebelum semua soal terjawab.\n\nSusun jawaban untuk SETIAP SOAL dengan struktur HTML yang sangat rapi dan mudah dipahami siswa seperti ini:\n<h3>Soal [Nomor]</h3>\n<ul>\n<li><b>Diketahui:</b> [Jelaskan poin-poin yang diketahui]</li>\n<li><b>Ditanya:</b> [Jelaskan apa yang ditanya]</li>\n</ul>\n<p><b>Konsep Dasar:</b> [Berikan 1-2 kalimat penjelasan rumus atau alur berpikirnya]</p>\n<p><b>Langkah Penyelesaian:</b><br>\n[Jabarkan perhitungan baris demi baris secara urut. WAJIB gunakan tag <br> untuk setiap turun/pindah baris hitungan agar teksnya tidak menyatu dan mudah dibaca]</p>\n<p><b>Jawaban Akhir:</b> [Tuliskan kesimpulan hasil akhirnya]</p>\n<hr>\n\nATURAN MUTLAK:\n1. JANGAN gunakan markdown seperti # atau **.\n2. JANGAN gunakan format LaTeX atau simbol dolar ($). Tulis rumus dengan teks biasa (contoh: x^2 untuk pangkat, akar(x) untuk akar, / untuk per).\n3. Jabarkan langkah hitungannya, jangan terlalu singkat, tapi tetap fokus dan tepat sasaran.\n\n";
+      
       const modelTugas = "meta-llama/llama-4-scout-17b-16e-instruct"; 
       let pesanKirim = [];
 
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Selesaikan semua soal matematika/sains pada gambar ini secara ringkas dan langsung ke rumus, gunakan HTML murni.");
+        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Selesaikan semua soal pada gambar ini menggunakan struktur HTML rapi sesuai format yang diminta.");
         
         pesanKirim.push({
           role: "user",
