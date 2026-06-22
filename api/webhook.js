@@ -488,4 +488,14 @@ export default async function handler(request) {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    }
+    } // <-- Ini adalah penutup dari blok else if (aiPilihan === "tugas")
+
+  } catch (error) {
+    // INI DIA BLOK YANG HILANG! Kita pasang pelacak error di sini
+    console.error("Sistem Utama Crash:", error);
+    await kirimPesanTelegram(chatId, "❌ SISTEM CRASH: " + error.message);
+  }
+
+  // Memberikan respon OK ke Telegram agar bot tidak looping
+  return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+} // <-- Ini penutup utama dari fungsi export default async function handler(request)
