@@ -457,7 +457,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "⏳ Groq Llama 4 sedang menganalisis tugasmu...");
       
       // Minta AI menulis dengan tag HTML murni agar rapi di browser
-      const instruksiPakar = "Kamu adalah guru matematika dan sains yang jenius. Tugasmu menjawab soal dengan SINGKAT, PADAT, dan TEPAT SASARAN. JANGAN menuliskan 'Diketahui', 'Ditanyakan', atau basa-basi. Langsung tuliskan rumus dan angka penyelesaiannya langkah demi langkah secara singkat agar seluruh soal bisa dijawab tanpa terpotong.\n\nWAJIB JAWAB MENGGUNAKAN FORMAT HTML (Gunakan <h3> untuk nomor soal, <p> untuk teks/rumus, <b> untuk hasil akhir). JANGAN gunakan simbol markdown seperti # atau **. JANGAN gunakan format LaTeX atau simbol dolar ($). Tulislah rumus dengan teks biasa (contoh: x^2 untuk pangkat, akar(x) untuk akar).\n\n";
+      const instruksiPakar = "Kamu adalah guru matematika dan sains yang jenius. Baca seluruh gambar dengan teliti dari atas ke bawah. Kerjakan SEMUA soal yang ada, baik itu Bagian A (Pilihan Ganda) maupun Bagian B (Essay). JANGAN menuliskan 'Diketahui', 'Ditanyakan', atau basa-basi. Langsung tuliskan rumus dan angka penyelesaiannya langkah demi langkah secara singkat agar seluruh soal bisa dijawab tanpa terpotong.\n\nWAJIB JAWAB MENGGUNAKAN FORMAT HTML (Gunakan <h3> untuk nomor soal, <p> untuk teks/rumus, <b> untuk hasil akhir). JANGAN gunakan simbol markdown seperti # atau **. JANGAN gunakan format LaTeX atau simbol dolar ($). Tulislah rumus dengan teks biasa (contoh: x^2 untuk pangkat, akar(x) untuk akar).\n\n";
       const modelTugas = "meta-llama/llama-4-scout-17b-16e-instruct"; 
       let pesanKirim = [];
 
