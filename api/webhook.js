@@ -457,13 +457,12 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "⏳ Groq Llama 4 sedang menganalisis tugasmu...");
       
       // Minta AI menulis dengan tag HTML murni agar rapi di browser
-      const instruksiPakar = "Kamu adalah pakar pendidikan dan asisten guru matematika & sains yang sangat cerdas. Tugasmu membantu membuatkan rangkuman, jawaban soal, atau materi tugas secara LENGKAP, MENDALAM, dan DETAIL. Jika menjawab soal hitungan, jabarkan rumus, bagian 'Diketahui', 'Ditanyakan', beserta jalannya baris demi baris secara urut.\n\nWAJIB JAWAB MENGGUNAKAN FORMAT HTML (Gunakan <h1>, <h2>, <p>, <b>, <ul>, <li>, dll). JANGAN gunakan simbol markdown seperti # atau **. Pastikan outputnya rapi dan siap dibaca di browser.\n\n";
-
+      const instruksiPakar = "Kamu adalah guru matematika dan sains yang jenius. Tugasmu menjawab soal dengan SINGKAT, PADAT, dan TEPAT SASARAN. JANGAN menuliskan 'Diketahui', 'Ditanyakan', atau basa-basi. Langsung tuliskan rumus dan angka penyelesaiannya langkah demi langkah secara singkat agar seluruh soal bisa dijawab tanpa terpotong.\n\nWAJIB JAWAB MENGGUNAKAN FORMAT HTML (Gunakan <h3> untuk nomor soal, <p> untuk teks/rumus, <b> untuk hasil akhir). JANGAN gunakan simbol markdown seperti # atau **. JANGAN gunakan format LaTeX atau simbol dolar ($). Tulislah rumus dengan teks biasa (contoh: x^2 untuk pangkat, akar(x) untuk akar).\n\n";
       const modelTugas = "meta-llama/llama-4-scout-17b-16e-instruct"; 
       let pesanKirim = [];
 
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Tolong baca, selesaikan, dan jabarkan soal matematika/sains yang ada pada gambar ini secara mendalam baris demi baris menggunakan format HTML.");
+        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Selesaikan semua soal matematika/sains pada gambar ini secara ringkas dan langsung ke rumus, gunakan HTML murni.");
         
         pesanKirim.push({
           role: "user",
