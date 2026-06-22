@@ -148,6 +148,48 @@ async function kirimFotoTelegramURL(chatId, urlFoto, caption) {
   });
 }
 
+async function kirimDokumenHtmlTelegram(chatId, teksMarkdown, namaFile, caption = "") {
+  // Mengubah format tulisan AI menjadi HTML yang rapi & ramah Google Docs
+  let htmlContent = teksMarkdown
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/### (.*?)(?:\n|$)/g, '<h3>$1</h3>')
+    .replace(/## (.*?)(?:\n|$)/g, '<h2>$1</h2>')
+    .replace(/# (.*?)(?:\n|$)/g, '<h1>$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^\s*[\-\*]\s+(.*)$/gm, '• $1')
+    .replace(/\n/g, '<br>');
+
+  // Desain layout kertas putih premium formal untuk tugas sekolah
+  const templateKertas = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Tugas Sekolah</title>
+      <style>
+        body { font-family: 'Arial', sans-serif; line-height: 1.6; padding: 20px; background-color: #f5f5f5; color: #333; }
+        .kertas-tugas { background: white; max-width: 800px; margin: 0 auto; padding: 45px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.05); box-sizing: border-box; }
+        h1 { color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 8px; margin-top: 0; font-size: 24px; text-align: center; }
+        h2 { color: #34495e; margin-top: 25px; font-size: 19px; border-left: 4px solid #34495e; padding-left: 10px; }
+        h3 { color: #555; margin-top: 20px; font-size: 16px; }
+        strong { color: #000; }
+      </style>
+    </head>
+    <body>
+      <div class="kertas-tugas">
+        ${htmlContent}
+      </div>
+    </body>
+    </html>
+  `;
+
+  const formData = new FormData();
+  formData.append('chat_id', chatId);
+  formData.append('document', new Blob([templateKertas], { type: 'text/html' }), namaFile);
+  if (caption) formData.append('caption', caption);
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument`, { method: 'POST', body: formData });
+}
+
 export default async function handler(request) {
   if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
@@ -217,8 +259,10 @@ export default async function handler(request) {
       await setRedis(`sesi_${chatId}`, "gambar");
     } else if (pesanLowercase.includes("@edit")) {
       await setRedis(`sesi_${chatId}`, "edit");
+    } else if (pesanLowercase.includes("@tugas")) {
+      await setRedis(`sesi_${chatId}`, "tugas");
     }
-
+    
     let aiPilihan = await getRedis(`sesi_${chatId}`);
 
     if (!aiPilihan) {
@@ -438,5 +482,40 @@ export default async function handler(request) {
     console.error("Global Error:", error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 200 });
   }
-        }
-          
+}
+  // [G] MODE TUGAS SEKOLAH (FORMAT DOKUMEN CETAK GOOGLE DOCS / PDF VIA GROQ)
+    else if (aiPilihan === "tugas") {
+      const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
+      if (!pertanyaanClean) {
+        await kirimPesanTelegram(chatId, "📝 *Sesi Dokumen Tugas Aktif!*\nSilakan ketik tugas/soal yang mau dibuat.\nContoh: `@tugas buatkan ringkasan rumus matematika Aljabar beserta contoh soalnya`");
+        return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+      }
+      
+      await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses dan menyusun jawaban tugasmu ke bentuk dokumen...");
+      
+      const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, 
+        body: JSON.stringify({ 
+          model: "llama-3.3-70b-versatile", 
+          messages: [
+            { 
+              role: "system", 
+              content: "Kamu adalah pakar pendidikan dan asisten guru matematika & sains yang sangat cerdas. Tugasmu membantu membuatkan rangkuman, jawaban soal, esai, atau materi tugas sekolah secara LENGKAP, MENDALAM, KOMPREHENSIF, dan sangat DETAIL. Jika menjawab soal hitungan (matematika/fisika), jabarkan rumus, bagian 'Diketahui', 'Ditanyakan', beserta jalannya baris demi baris secara urut dan jelas agar mudah dipahami siswa. Gunakan simbol # untuk Judul Utama, ## untuk Sub-Bab, dan ### untuk poin kecil." 
+            },
+            { role: "user", content: pertanyaanClean }
+          ] 
+        })
+      });
+      
+      const groqData = await resGroqTugas.json();
+      const hasilTugas = groqData.choices?.[0]?.message?.content || "⚠️ Gagal membuat tugas.";
+      
+      if (!hasilTugas.startsWith("⚠️")) {
+        await kirimPesanTelegram(chatId, "✅ Dokumen tugas berhasil dicetak!");
+        // Mengirimkan file dokumen cetak .html secara realtime
+        await kirimDokumenHtmlTelegram(chatId, hasilTugas, "Tugas_Sekolah_Siap_Cetak.html", `📄 Perintah: ${pertanyaanClean.substring(0, 30)}...`);
+      } else {
+        await kirimPesanTelegram(chatId, "❌ Terjadi gangguan server saat membuat berkas.");
+      }
+    }
