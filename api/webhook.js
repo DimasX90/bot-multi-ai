@@ -148,6 +148,19 @@ async function kirimFotoTelegramURL(chatId, urlFoto, caption) {
   });
 }
 
+async function kirimDokumenHtmlTelegram(chatId, kontenHtml, namaFile, caption) {
+  const formData = new FormData();
+  formData.append('chat_id', chatId);
+  // Mengubah teks HTML dari AI menjadi file fisik
+  formData.append('document', new Blob([kontenHtml], { type: 'text/html' }), namaFile);
+  if (caption) formData.append('caption', caption);
+
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument`, {
+    method: 'POST',
+    body: formData
+  });
+}
+
 export default async function handler(request) {
   if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
