@@ -454,6 +454,13 @@ export default async function handler(request) {
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
+      // 🔥 KUNCI PINDAH SALURAN: Jika pengguna CUMA mengetik @tugas (tanpa teks/foto), langsung aktifkan saluran tanpa panggil AI
+      if (!pertanyaanClean && !base64Image) {
+        await kirimPesanTelegram(chatId, "📝 *Saluran Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
+        return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+      }
+      
+      // Pesan loading ini HANYA akan muncul jika pengguna mengirimkan teks soal atau foto tugas
       await kirimPesanTelegram(chatId, "⏳ Groq Llama 4 sedang menganalisis tugasmu...");
       
       // Minta AI menulis dengan tag HTML murni agar rapi di browser
@@ -472,10 +479,6 @@ export default async function handler(request) {
           ]
         });
       } else {
-        if (!pertanyaanClean) {
-          await kirimPesanTelegram(chatId, "📝 *Sesi Dokumen Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
-          return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
-        }
         pesanKirim.push({ role: "user", content: instruksiPakar + pertanyaanClean });
       }
       
@@ -497,7 +500,7 @@ export default async function handler(request) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
-        // 🔥 TAMBAHAN BARU: Membungkus teks AI dengan desain CSS agar tulisannya besar, rapi, dan responsif di HP!
+        // 🔥 Desain CSS Premium + MathJax Pembaca Rumus Matriks
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -522,7 +525,6 @@ export default async function handler(request) {
                 p { margin-bottom: 12px; }
                 hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
                 b { color: #000; }
-                /* Agar rumus panjang bisa digeser ke samping di HP */
                 .MathJax { overflow-x: auto; overflow-y: hidden; }
             </style>
         </head>
@@ -532,3 +534,11 @@ export default async function handler(request) {
         </body>
         </html>
         `;
+
+        // 🔥 MENGEKSEKUSI PENGIRIMAN FILE HTML YANG UTUH
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Groq Llama 4`);
+      } else {
+        const pesanError = groqData.error?.message || JSON.stringify(groqData);
+        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
+      }
+    }
