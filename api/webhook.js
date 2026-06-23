@@ -457,7 +457,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "⏳ Groq Llama 4 sedang menganalisis tugasmu...");
       
       // Minta AI menulis dengan tag HTML murni agar rapi di browser
-      const instruksiPakar = "Kamu adalah guru matematika yang jenius dan sabar. TUGASMU ADA 2 TAHAP PADA GAMBAR INI: Tahap 1 (Bagian A) dan Tahap 2 (Bagian B). JANGAN BERHENTI SEBELUM KEDUANYA SELESAI!\n\nSusun jawaban untuk SETIAP SOAL dengan struktur HTML yang rapi dan PENJELASAN YANG MASUK AKAL (Jelas alur logikanya, tidak asal loncat rumus):\n<h3>Soal [Nomor]</h3>\n<ul>\n<li><b>Diketahui:</b> [Sebutkan info penting secara jelas]</li>\n<li><b>Ditanya:</b> [Sebutkan apa yang dicari]</li>\n</ul>\n<p><b>Konsep:</b> [Jelaskan rumus atau teori yang digunakan dengan bahasa yang mudah dipahami]</p>\n<p><b>Langkah Penyelesaian:</b><br>\n[Tuliskan penjabaran hitungan baris demi baris secara urut dan logis. WAJIB gunakan tag <br> setiap kali turun baris pada hitungan agar angkanya tidak menumpuk menjadi satu paragraf!]</p>\n<p><b>Jawaban Akhir:</b> [Kesimpulan hasil akhir]</p>\n<hr>\n\nATURAN MUTLAK:\n1. JANGAN gunakan markdown seperti # atau **.\n2. JANGAN gunakan format LaTeX atau simbol dolar ($).\n3. Tulis pangkat menggunakan tag HTML <sup> (contoh: x<sup>2</sup>).\n4. JANGAN melompati langkah perhitungan. Jabarkan pelan-pelan agar siswa paham dari mana asal angkanya.\n\n";     
+      const instruksiPakar = "Kamu adalah guru matematika yang jenius dan sabar. TUGASMU ADA 2 TAHAP PADA GAMBAR INI: Tahap 1 (Bagian A) dan Tahap 2 (Bagian B). JANGAN BERHENTI SEBELUM KEDUANYA SELESAI!\n\nSusun jawaban untuk SETIAP SOAL dengan struktur HTML yang rapi dan logis:\n<h3>Soal [Nomor]</h3>\n<ul>\n<li><b>Diketahui:</b> [Sebutkan info penting secara jelas]</li>\n<li><b>Ditanya:</b> [Sebutkan apa yang dicari]</li>\n</ul>\n<p><b>Konsep:</b> [Jelaskan rumus/teori yang digunakan]</p>\n<p><b>Langkah Penyelesaian:</b><br>\n[Jabarkan hitungan baris demi baris secara urut. WAJIB gunakan tag <br> setiap kali turun baris pada hitungan!]</p>\n<p><b>Jawaban Akhir:</b> [Kesimpulan hasil akhir]</p>\n<hr>\n\nATURAN MUTLAK:\n1. JANGAN gunakan markdown seperti # atau **.\n2. KARENA INI MATEMATIKA, KAMU WAJIB MENGGUNAKAN FORMAT LATEX ($ atau $$) UNTUK SEMUA RUMUS DAN MATRIKS! Nanti sistem akan mengubahnya menjadi rumus yang cantik.\n3. JANGAN melompati langkah perhitungan. Jabarkan pelan-pelan.\n\n";     
       const modelTugas = "meta-llama/llama-4-scout-17b-16e-instruct"; 
       let pesanKirim = [];
 
@@ -505,29 +505,25 @@ export default async function handler(request) {
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Kunci Jawaban & Pembahasan</title>
+            
+            <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+            <script>
+              window.MathJax = {
+                tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] }
+              };
+            </script>
+
             <style>
-                /* Pengaturan gaya teks dan ukuran halaman */
-                body { 
-                    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-                    line-height: 1.6; 
-                    padding: 20px; 
-                    color: #222; 
-                    max-width: 800px; 
-                    margin: 0 auto; 
-                    font-size: 16px; /* Ukuran font standar yang enak dibaca */
-                }
-                h3 { 
-                    color: #2c3e50; 
-                    border-bottom: 2px solid #3498db; 
-                    padding-bottom: 8px; 
-                    margin-top: 30px; 
-                }
+                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
+                h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
                 li { margin-bottom: 5px; }
                 p { margin-bottom: 12px; }
                 hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
-                /* Efek stabilo hijau untuk jawaban akhir agar menonjol */
                 b { color: #000; }
+                /* Agar rumus panjang bisa digeser ke samping di HP */
+                .MathJax { overflow-x: auto; overflow-y: hidden; }
             </style>
         </head>
         <body>
@@ -536,9 +532,3 @@ export default async function handler(request) {
         </body>
         </html>
         `;
-
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Groq Llama 4`);
-      } else {
-        const pesanError = groqData.error?.message || JSON.stringify(groqData);
-        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
-      }
