@@ -518,7 +518,7 @@ export default async function handler(request) {
             </script>
 
             <style>
-                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
+                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
                 h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
                 li { margin-bottom: 5px; }
