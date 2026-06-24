@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO)
+        // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO)
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -460,7 +460,7 @@ export default async function handler(request) {
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Qwen AI sedang menganalisis tugasmu...");
+      await kirimPesanTelegram(chatId, "⏳ Llama 4 Scout sedang menganalisis tugasmu...");
       
       // 🔥 INSTRUKSI SUPER PREMIUM v6
       const instruksiPakar = `Kamu adalah guru matematika formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
@@ -486,10 +486,10 @@ ATURAN MUTLAK:
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan jari-jari/pusat terlebih dahulu jika ada persamaan awal!`;
       
-      const modelTugas = "qwen/qwen3.6-27b"; 
+      // 🔥 MENGGUNAKAN MODEL LLAMA 4 SCOUT SESUAI PERMINTAAN
+      const modelTugas = "meta-llama/llama-4-scout-17b-16e-instruct"; 
       let pesanKirim = [];
 
-      // 🔥 PERUBAHAN 1: Masukkan instruksi sebagai "SYSTEM" agar AI lebih patuh
       pesanKirim.push({ role: "system", content: instruksiPakar });
 
       if (base64Image) {
@@ -512,7 +512,7 @@ ATURAN MUTLAK:
         body: JSON.stringify({ 
           model: modelTugas, 
           messages: pesanKirim,
-          max_completion_tokens: 4096, 
+          max_completion_tokens: 3000, 
           temperature: 0.4
         })
       });
@@ -524,7 +524,7 @@ ATURAN MUTLAK:
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
-        // 🔥 PERUBAHAN 2: PEMOTONGAN PAKSA SUPER KETAT (REGEX DEWA)
+        // 🔥 PEMOTONGAN PAKSA SUPER KETAT (REGEX DEWA)
         let htmlBersih = hasilTugas;
         
         // 1. Musnahkan tag <think> dan SELURUH isinya sampai akar
@@ -573,10 +573,10 @@ ATURAN MUTLAK:
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Qwen AI`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama 4 Scout AI`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    } // <-- Batas penutup blok tugas
-  
+    }
+    
