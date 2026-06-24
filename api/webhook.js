@@ -487,7 +487,7 @@ ATURAN MUTLAK:
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan jari-jari/pusat terlebih dahulu jika ada persamaan awal!`;
       
       // 🔥 MENGGUNAKAN MODEL LLAMA 4 SCOUT SESUAI PERMINTAAN
-      const modelTugas = "llama-3.2-11b-vision-preview"; 
+      const modelTugas = "meta-llama/llama-4-scout-17b-16e-instruct"; 
       let pesanKirim = [];
 
       pesanKirim.push({ role: "system", content: instruksiPakar });
