@@ -514,7 +514,7 @@ ATURAN MUTLAK:
           max_completion_tokens: 4096,
           temperature: 0.6,
           top_p: 0.95,
-          reasoning_effort: "low" // Mencegah AI overthinking & boros token berpikir
+          reasoning_effort: "none" // Mencegah AI overthinking & boros token berpikir
         })
       });
       
