@@ -509,7 +509,7 @@ ATURAN MUTLAK:
         body: JSON.stringify({ 
           model: modelTugas, 
           messages: pesanKirim,
-          max_completion_tokens: 8000, 
+          max_completion_tokens: 4096, 
           temperature: 0.4
         })
       });
