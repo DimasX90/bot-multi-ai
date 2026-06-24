@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-        // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - KUNCI FORMAT AWAL FILE 24
+            // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - FORMAT DESAIN AWAL FILE 24 100% AMAN DI HP
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -482,7 +482,7 @@ Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali
 ATURAN MUTLAK:
 1. JANGAN gunakan markdown seperti # atau **.
 2. WAJIB gunakan format pmatrix LaTeX ($ atau $$) untuk matriks.
-3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \\times or \\cdot.
+3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \\times atau \\cdot.
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
       
@@ -552,7 +552,7 @@ ATURAN MUTLAK:
             </script>
 
             <style>
-                /* 100% KEMBALI KE STRUKTUR DESAIN ASLI FILE 24 YANG AMAN DI LAYAR HP */
+                /* KEMBALI 100% KE STRUKTUR DESAIN ASLI FILE 24 YANG AMAN DI LAYAR HP */
                 body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
                 h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
@@ -565,7 +565,7 @@ ATURAN MUTLAK:
         </head>
         <body>
             <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
-            \${htmlBersih}
+            ${htmlBersih}
         </body>
         </html>
         `;
@@ -573,7 +573,7 @@ ATURAN MUTLAK:
         await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Qwen AI`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
-        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`\${pesanError}\``);
+        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
     } // Penutup dari else if (aiPilihan === "tugas")
     
@@ -583,4 +583,3 @@ ATURAN MUTLAK:
 
   return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
 } 
-            
