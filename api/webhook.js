@@ -524,17 +524,20 @@ ATURAN MUTLAK:
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
-        // 🔥 PERUBAHAN 2: PEMOTONGAN PAKSA (DEVELOPER TRICK)
+        // 🔥 PERUBAHAN 2: PEMOTONGAN PAKSA SUPER KETAT (REGEX DEWA)
         let htmlBersih = hasilTugas;
-        const indexMulai = htmlBersih.indexOf("<h3"); // Cari tag H3 pertama
         
-        if (indexMulai !== -1) {
-            // Potong dan buang semua teks basa-basi sebelum <h3>
-            htmlBersih = htmlBersih.substring(indexMulai); 
+        // 1. Musnahkan tag <think> dan SELURUH isinya sampai akar
+        htmlBersih = htmlBersih.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        
+        // 2. Buang tag markdown block ```html
+        htmlBersih = htmlBersih.replace(/```html/gi, '').replace(/```/g, '');
+        
+        // 3. Ekstrak PAKSA hanya teks yang dimulai dari <h3> sampai bawah
+        const ekstrakHtml = htmlBersih.match(/<h3[\s\S]*/i);
+        if (ekstrakHtml) {
+            htmlBersih = ekstrakHtml[0];
         }
-        
-        // Buang tag markdown block ```html jika AI masih membawanya
-        htmlBersih = htmlBersih.replace(/```html/g, "").replace(/```/g, "").trim();
         
         const desainHtmlUtuh = `
         <!DOCTYPE html>
