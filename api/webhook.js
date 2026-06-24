@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH - FIX REGEX & KUNCI FORMAT AWAL FILE 24 RESPONSIF HP
+        // [G] MODE TUGAS SEKOLAH - FORMAT AWAL FILE 24 & BEBAS ERROR REASONING LLAMA
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -460,7 +460,7 @@ export default async function handler(request) {
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Qwen AI sedang menganalisis tugasmu dengan optimasi token...");
+      await kirimPesanTelegram(chatId, "⏳ Llama AI sedang menganalisis tugasmu dengan kapasitas penuh...");
       
       // 🔥 INSTRUKSI SUPER PREMIUM v6
       const instruksiPakar = `Kamu adalah guru matematika/sains formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
@@ -512,9 +512,9 @@ ATURAN MUTLAK:
           model: modelTugas, 
           messages: pesanKirim,
           max_completion_tokens: 4096,
-          temperature: 0.6,
-          top_p: 0.95,
-          reasoning_effort: "none"
+          temperature: 0.5,
+          top_p: 0.95
+          // 🔥 Parameter reasoning_effort dihapus total agar Llama 70B berjalan mulus tanpa error
         })
       });
       
@@ -525,18 +525,13 @@ ATURAN MUTLAK:
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
-        // 🔥 PERBAIKAN REGEX DEWA (Mendukung h3 huruf besar maupun huruf kecil)
         let htmlBersih = hasilTugas;
         htmlBersih = htmlBersih.replace(/<think>[\s\S]*?<\/think>/gi, '');
         htmlBersih = htmlBersih.replace(/```html/gi, '').replace(/```/g, '');
         
-        // Ekstrak toleran menggunakan flag /i (Case-Insensitive)
         const ekstrakHtml = htmlBersih.match(/<h3[\s\S]*/i);
         if (ekstrakHtml) {
             htmlBersih = ekstrakHtml[0];
-        } else {
-            // Pelapis cadangan jika AI tidak mematuhi tag h3 sama sekali
-            htmlBersih = hasilTugas;
         }
         
         const desainHtmlUtuh = `
@@ -556,7 +551,7 @@ ATURAN MUTLAK:
             </script>
 
             <style>
-                /* 100% KEMBALI KAKU KE FORMAT STABIL FILE NOMOR 24 */
+                /* KEMBALI MURNI KAKU KE FORMAT AWAL FILE 24 (PUTIH BERSIH & AMAN DI HP) */
                 body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
                 h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
@@ -574,7 +569,7 @@ ATURAN MUTLAK:
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Qwen AI`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama AI`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
@@ -586,4 +581,5 @@ ATURAN MUTLAK:
   }
 
   return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
-}
+} 
+                  
