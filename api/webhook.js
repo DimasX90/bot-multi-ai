@@ -511,7 +511,7 @@ ATURAN MUTLAK:
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
           body: JSON.stringify({
-            model: "llama-3.2-11b-vision-preview", 
+            model: "llama-3.2-90b-vision-preview", 
             messages: pesanKirimGroq,
             max_completion_tokens: 4096,
             temperature: 0.4,
