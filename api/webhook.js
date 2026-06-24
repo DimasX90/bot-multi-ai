@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-        // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - TANPA REDIS & RESOLUSI BARU
+    // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - BERSIH CACHE + OPTIMALISASI REASONING
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -460,7 +460,7 @@ export default async function handler(request) {
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Llama Vision AI sedang menganalisis tugasmu...");
+      await kirimPesanTelegram(chatId, "⏳ Qwen AI sedang menganalisis tugasmu dengan optimasi token...");
       
       // 🔥 INSTRUKSI SUPER PREMIUM v6
       const instruksiPakar = `Kamu adalah guru matematika/sains formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
@@ -486,7 +486,8 @@ ATURAN MUTLAK:
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
       
-      const modelTugas = "llama-3.2-90b-vision-preview"; 
+      // 🔥 MENGGUNAKAN QWEN YANG SUDAH DIJINAKKAN
+      const modelTugas = "qwen/qwen3.6-27b"; 
       let pesanKirim = [];
 
       pesanKirim.push({ role: "system", content: instruksiPakar });
@@ -511,8 +512,10 @@ ATURAN MUTLAK:
         body: JSON.stringify({ 
           model: modelTugas, 
           messages: pesanKirim,
-          max_completion_tokens: 3000, 
-          temperature: 0.4
+          max_completion_tokens: 4096, // Jatah plafon napas penuh 4096 aman
+          temperature: 0.6,             // Sesuai parameter penemuanmu
+          top_p: 0.95,                  // Sesuai parameter penemuanmu
+          reasoning_effort: "low"       // 🔥 TRIK UTAMA: Memangkas durasi berpikir agar token hemat dan tidak terpotong!
         })
       });
       
@@ -567,16 +570,9 @@ ATURAN MUTLAK:
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama Vision AI`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Qwen AI`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    } // Penutup blok tugas
-    
-  } catch (error) {
-    console.error('Webhook handler error:', error);
-  }
-
-  return new Response(JSON.stringify({ status: 'error_global_handled' }), { status: 200 });
-} 
+    }
