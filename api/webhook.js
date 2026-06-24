@@ -469,10 +469,9 @@ Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali
 ATURAN MUTLAK:
 1. JANGAN gunakan markdown seperti # atau **.
 2. WAJIB gunakan format pmatrix LaTeX ($ atau $$) untuk matriks.
-3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \\times atau \\cdot.
+3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \times atau \cdot.
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
-5. ANTI LOMPAT LOGIKA DASAR: Jika soal melibatkan persamaan awal (seperti lingkaran), JABARKAN cara mendapatkan jari-jari dan pusatnya terlebih dahulu secara tertulis! (Contoh: r = \\sqrt{25} = 5). Jangan langsung menyebutkan angka hasil akhirnya!
-6. ANTI PEMBOROSAN TOKEN: DILARANG KERAS melakukan simulasi mental atau mengeluarkan tag <think>! LANGSUNG cetak struktur HTML-nya dari soal pertama sampai akhir untuk menghemat token!`;
+5. ANTI LOMPAT LOGIKA DASAR: Jika soal melibatkan persamaan awal (seperti lingkaran), JABARKAN cara mendapatkan jari-jari dan pusatnya terlebih dahulu secara tertulis! (Contoh: r = \sqrt{25} = 5). Jangan langsung menyebutkan angka hasil akhirnya!`;      
       
       const modelTugas = "qwen/qwen3.6-27b"; 
       let pesanKirim = [];
