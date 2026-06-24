@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH - FORMAT STABIL FILE 24 & STRUKTUR TEKS MURNI AMAN LLAMA 70B
+    // [G] MODE TUGAS SEKOLAH - MIGRASI UTUH GEMINI AI & KUNCI FORMAT AWAL FILE 24
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -460,10 +460,10 @@ export default async function handler(request) {
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Llama AI sedang menganalisis tugasmu dengan kapasitas penuh...");
+      await kirimPesanTelegram(chatId, "⏳ Gemini AI sedang menganalisis tugas rumitmu, mohon tunggu sebentar...");
       
       // 🔥 INSTRUKSI SUPER PREMIUM v6
-      const instruksiPakar = `Kamu adalah guru matematika/sains formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG DIBERIKAN SECARA BERURUTAN!
+      const instruksiPakar = `Kamu adalah guru matematika/sains formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
 
 Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali:
 
@@ -486,38 +486,51 @@ ATURAN MUTLAK:
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
       
-      const modelTugas = "llama-3.3-70b-versatile"; 
-      let pesanKirim = [];
+      let hasilTugas = "";
 
-      pesanKirim.push({ role: "system", content: instruksiPakar });
+      try {
+        // 🔥 INTEGRASI RESMI GEMINI API VIA HTTP FETCH
+        let contentsPayload = [];
+        
+        if (base64Image) {
+          const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
+          contentsPayload.push({
+            role: "user",
+            parts: [
+              { text: `${instruksiPakar}\n\n${teksPrompt}` },
+              {
+                inlineData: {
+                  mimeType: "image/jpeg",
+                  data: base64Image
+                }
+              }
+            ]
+          });
+        } else {
+          contentsPayload.push({
+            role: "user",
+            parts: [{ text: `${instruksiPakar}\n\n${pertanyaanClean}` }]
+          });
+        }
 
-      // 🔥 FIX UTAMA: Mengonversi isi content menjadi string murni agar Llama 70B tidak error
-      if (base64Image) {
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan dan selesaikan soal matematika/sains yang diberikan sesuai format HTML wajib sistem.";
-        pesanKirim.push({ role: "user", content: teksPrompt });
-      } else {
-        pesanKirim.push({ role: "user", content: pertanyaanClean });
+        const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: contentsPayload })
+        });
+
+        const geminiData = await resGemini.json();
+        hasilTugas = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+      } catch (errApi) {
+        console.error("Gemini Error:", errApi);
       }
-      
-      const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, 
-        body: JSON.stringify({ 
-          model: modelTugas, 
-          messages: pesanKirim,
-          max_completion_tokens: 4096,
-          temperature: 0.5,
-          top_p: 0.95
-        })
-      });
-      
-      const groqData = await resGroqTugas.json();
-      const hasilTugas = groqData.choices?.[0]?.message?.content;
       
       if (hasilTugas) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
+        // 🔥 PEMOTONGAN PAKSA SUPER KETAT (REGEX DEWA SENSITIF HURUF BESAR/KECIL)
         let htmlBersih = hasilTugas;
         htmlBersih = htmlBersih.replace(/<think>[\s\S]*?<\/think>/gi, '');
         htmlBersih = htmlBersih.replace(/```html/gi, '').replace(/```/g, '');
@@ -544,7 +557,7 @@ ATURAN MUTLAK:
             </script>
 
             <style>
-                /* KEMBALI MURNI KAKU KE FORMAT AWAL FILE 24 (PUTIH BERSIH & AMAN DI HP) */
+                /* 100% KEMBALI KAKU KE FORMAT AWAL FILE 24 (PUTIH BERSIH & AMAN DI HP) */
                 body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
                 h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
@@ -562,10 +575,9 @@ ATURAN MUTLAK:
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama AI`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Gemini AI`);
       } else {
-        const pesanError = groqData.error?.message || JSON.stringify(groqData);
-        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
+        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\nGemini AI tidak memberikan respon valid atau kuota key terganggu.`);
       }
     } // Penutup dari else if (aiPilihan === "tugas")
     
