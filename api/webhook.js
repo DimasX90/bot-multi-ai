@@ -450,21 +450,42 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO VIA GROQ LLAMA VISION)
+        // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO)
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
-      // 🔥 KUNCI PINDAH SALURAN: Jika pengguna CUMA mengetik @tugas (tanpa teks/foto), langsung aktifkan saluran tanpa panggil AI
+      // 🔥 KUNCI PINDAH SALURAN
       if (!pertanyaanClean && !base64Image) {
         await kirimPesanTelegram(chatId, "📝 *Saluran Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      // Pesan loading ini HANYA akan muncul jika pengguna mengirimkan teks soal atau foto tugas
-      await kirimPesanTelegram(chatId, "⏳ Groq Llama 4 sedang menganalisis tugasmu...");
+      await kirimPesanTelegram(chatId, "⏳ Qwen AI sedang menganalisis tugasmu...");
       
-      // Minta AI menulis dengan tag HTML murni agar rapi di browser
-      const instruksiPakar = "Kamu adalah guru matematika formal sekolah. TUGASMU ADA 2 TAHAP PADA GAMBAR INI: Tahap 1 (Bagian A) dan Tahap 2 (Bagian B). JANGAN BERHENTI SEBELUM KEDUANYA SELESAI!\n\nUntuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali:\n\n<h3>Soal [Nomor]</h3>\n<ul>\n<li><b>Diketahui:</b> [Singkat]</li>\n<li><b>Ditanya:</b> [Singkat]</li>\n</ul>\n<p><b>Rumus Umum Matriks (Wajib Tulis Huruf/Simbol):</b><br>\n[Jelaskan teori dan WAJIB tulis RUMUS UMUM matriksnya menggunakan variabel huruf/trigonometri seperti sin, cos, a, b, x, y dengan LaTeX $$...$$. DI BAGIAN INI DILARANG KERAS MEMASUKKAN ANGKA DARI SOAL!]</p>\n<p><b>Langkah Penyelesaian (Substitusi Angka):</b><br>\n[Tulis ulang matriksnya dan masukkan angka dari soal. Jabarkan hitungan baris demi baris menggunakan tag <br> setiap turun baris!]</p>\n<p><b>Jawaban Akhir:</b> [Kesimpulan]</p>\n<hr>\n\nATURAN MUTLAK:\n1. JANGAN gunakan markdown seperti # atau **.\n2. WAJIB gunakan format pmatrix LaTeX ($ atau $$) untuk matriks.\n3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \\times atau \\cdot.\n4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!\n5. ANTI LOMPAT LOGIKA DASAR: Jika soal melibatkan persamaan awal (seperti lingkaran), JABARKAN cara mendapatkan jari-jari dan pusatnya terlebih dahulu secara tertulis! (Contoh: r = \\sqrt{25} = 5). Jangan langsung menyebutkan angka hasil akhirnya!\n\n";     
+      // 🔥 INSTRUKSI SUPER PREMIUM v6 (Format Backtick Anti-Error)
+      const instruksiPakar = `Kamu adalah guru matematika formal sekolah. TUGASMU ADA 2 TAHAP PADA GAMBAR INI: Tahap 1 (Bagian A) dan Tahap 2 (Bagian B). JANGAN BERHENTI SEBELUM KEDUANYA SELESAI!
+
+Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali:
+
+<h3>Soal [Nomor]</h3>
+<ul>
+<li><b>Diketahui:</b> [Singkat]</li>
+<li><b>Ditanya:</b> [Singkat]</li>
+</ul>
+<p><b>Rumus Umum Matriks (Wajib Tulis Huruf/Simbol):</b><br>
+[Jelaskan teori dan WAJIB tulis RUMUS UMUM matriksnya menggunakan variabel huruf/trigonometri seperti sin, cos, a, b, x, y dengan LaTeX $...$ atau $$...$$. DI BAGIAN INI DILARANG KERAS MEMASUKKAN ANGKA DARI SOAL!]</p>
+<p><b>Langkah Penyelesaian (Substitusi Angka):</b><br>
+[Tulis ulang matriksnya dan masukkan angka dari soal. Jabarkan hitungan baris demi baris menggunakan tag <br> setiap turun baris!]</p>
+<p><b>Jawaban Akhir:</b> [Kesimpulan]</p>
+<hr>
+
+ATURAN MUTLAK:
+1. JANGAN gunakan markdown seperti # atau **.
+2. WAJIB gunakan format pmatrix LaTeX ($ atau $$) untuk matriks.
+3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \\times atau \\cdot.
+4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
+5. ANTI LOMPAT LOGIKA DASAR: Jika soal melibatkan persamaan awal (seperti lingkaran), JABARKAN cara mendapatkan jari-jari dan pusatnya terlebih dahulu secara tertulis! (Contoh: r = \\sqrt{25} = 5). Jangan langsung menyebutkan angka hasil akhirnya!`;
+      
       const modelTugas = "qwen/qwen3.6-27b"; 
       let pesanKirim = [];
 
@@ -500,7 +521,6 @@ export default async function handler(request) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
-        // 🔥 Desain CSS Premium + MathJax Pembaca Rumus Matriks
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -518,7 +538,7 @@ export default async function handler(request) {
             </script>
 
             <style>
-                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
+                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
                 h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
                 li { margin-bottom: 5px; }
@@ -535,10 +555,16 @@ export default async function handler(request) {
         </html>
         `;
 
-        // 🔥 MENGEKSEKUSI PENGIRIMAN FILE HTML YANG UTUH
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Groq Llama 4`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Qwen AI`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    }
+    } // <-- Batas penutup blok tugas
+    
+  } catch (error) {
+    console.error('Error:', error);
+  }
+  
+  return new Response('OK', { status: 200 });
+} // <-- PENUTUP FUNGSI UTAMA (Sangat penting agar Vercel tidak Error!)
