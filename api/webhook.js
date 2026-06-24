@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - BERSIH CACHE + OPTIMALISASI REASONING
+        // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - REASONING LOW & STRUKTUR AMAN VERCEL
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -486,7 +486,6 @@ ATURAN MUTLAK:
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
       
-      // 🔥 MENGGUNAKAN QWEN YANG SUDAH DIJINAKKAN
       const modelTugas = "qwen/qwen3.6-27b"; 
       let pesanKirim = [];
 
@@ -512,10 +511,10 @@ ATURAN MUTLAK:
         body: JSON.stringify({ 
           model: modelTugas, 
           messages: pesanKirim,
-          max_completion_tokens: 4096, // Jatah plafon napas penuh 4096 aman
-          temperature: 0.6,             // Sesuai parameter penemuanmu
-          top_p: 0.95,                  // Sesuai parameter penemuanmu
-          reasoning_effort: "low"       // 🔥 TRIK UTAMA: Memangkas durasi berpikir agar token hemat dan tidak terpotong!
+          max_completion_tokens: 4096,
+          temperature: 0.6,
+          top_p: 0.95,
+          reasoning_effort: "low" // Mencegah AI overthinking & boros token berpikir
         })
       });
       
@@ -575,4 +574,11 @@ ATURAN MUTLAK:
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    }
+    } // Penutup dari else if (aiPilihan === "tugas")
+    
+  } catch (error) {
+    console.error('Webhook handler error:', error);
+  }
+
+  return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
+} // Penutup akhir dari export default async function handler(req)
