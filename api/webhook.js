@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-                // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - FORMAT DESAIN AWAL LAYAR HP
+    // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - FORMAT DESAIN AWAL 100% RESPONSIF HP
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -514,7 +514,7 @@ ATURAN MUTLAK:
           max_completion_tokens: 4096,
           temperature: 0.6,
           top_p: 0.95,
-          reasoning_effort: "none" // Mengunci respon instan Qwen tanpa <think>
+          reasoning_effort: "none" // Mengunci respons instan Qwen tanpa <think>
         })
       });
       
@@ -552,7 +552,7 @@ ATURAN MUTLAK:
             </script>
 
             <style>
-                /* 🔥 KEMBALI 100% KE STRUKTUR DESAIN AWAL (REFERENSI FILE 24) */
+                /* KEMBALI MURNI KE DESAIN ASLI FILE 24 (SANGAT COCOK UNTUK HP) */
                 body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
                 h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
@@ -582,4 +582,4 @@ ATURAN MUTLAK:
   }
 
   return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
-}
+} 
