@@ -486,7 +486,7 @@ ATURAN MUTLAK:
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
       
-      const modelTugas = "llama-3.2-11b-vision-instruct"; 
+      const modelTugas = "llama-3.2-90b-vision-preview"; 
       let pesanKirim = [];
 
       pesanKirim.push({ role: "system", content: instruksiPakar });
