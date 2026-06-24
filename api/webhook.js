@@ -466,25 +466,13 @@ export default async function handler(request) {
       const instruksiPakar = `Kamu adalah guru matematika formal sekolah. TUGASMU ADA 2 TAHAP PADA GAMBAR INI: Tahap 1 (Bagian A) dan Tahap 2 (Bagian B). JANGAN BERHENTI SEBELUM KEDUANYA SELESAI!
 
 Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali:
-
-<h3>Soal [Nomor]</h3>
-<ul>
-<li><b>Diketahui:</b> [Singkat]</li>
-<li><b>Ditanya:</b> [Singkat]</li>
-</ul>
-<p><b>Rumus Umum Matriks (Wajib Tulis Huruf/Simbol):</b><br>
-[Jelaskan teori dan WAJIB tulis RUMUS UMUM matriksnya menggunakan variabel huruf/trigonometri seperti sin, cos, a, b, x, y dengan LaTeX $...$ atau $$...$$. DI BAGIAN INI DILARANG KERAS MEMASUKKAN ANGKA DARI SOAL!]</p>
-<p><b>Langkah Penyelesaian (Substitusi Angka):</b><br>
-[Tulis ulang matriksnya dan masukkan angka dari soal. Jabarkan hitungan baris demi baris menggunakan tag <br> setiap turun baris!]</p>
-<p><b>Jawaban Akhir:</b> [Kesimpulan]</p>
-<hr>
-
 ATURAN MUTLAK:
 1. JANGAN gunakan markdown seperti # atau **.
 2. WAJIB gunakan format pmatrix LaTeX ($ atau $$) untuk matriks.
 3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \\times atau \\cdot.
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
-5. ANTI LOMPAT LOGIKA DASAR: Jika soal melibatkan persamaan awal (seperti lingkaran), JABARKAN cara mendapatkan jari-jari dan pusatnya terlebih dahulu secara tertulis! (Contoh: r = \\sqrt{25} = 5). Jangan langsung menyebutkan angka hasil akhirnya!`;
+5. ANTI LOMPAT LOGIKA DASAR: Jika soal melibatkan persamaan awal (seperti lingkaran), JABARKAN cara mendapatkan jari-jari dan pusatnya terlebih dahulu secara tertulis! (Contoh: r = \\sqrt{25} = 5). Jangan langsung menyebutkan angka hasil akhirnya!
+6. ANTI PEMBOROSAN TOKEN: DILARANG KERAS melakukan simulasi mental atau mengeluarkan tag <think>! LANGSUNG cetak struktur HTML-nya dari soal pertama sampai akhir untuk menghemat token!`;
       
       const modelTugas = "qwen/qwen3.6-27b"; 
       let pesanKirim = [];
