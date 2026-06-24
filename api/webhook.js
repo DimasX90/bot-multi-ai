@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-            // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - CACHE REDIS DIHAPUS TOTAL
+    // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - CACHE REDIS DIHAPUS TOTAL
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -579,5 +579,4 @@ ATURAN MUTLAK:
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    } // <-- Batas penutup blok tugas
-  
+    }
