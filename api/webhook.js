@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-        // [G] MODE TUGAS SEKOLAH - FIX PAYLOAD FETCH GEMINI & KUNCI FORMAT STABIL FILE 24
+            // [G] MODE TUGAS SEKOLAH - INTEGRASI GEMINI + TRANSPARANSI DETAIL ERROR LOGS
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -487,16 +487,13 @@ ATURAN MUTLAK:
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
       
       let hasilTugas = "";
+      let detailErrorSistem = ""; // Wadah penampung pesan error asli
 
       try {
-        // 🔥 RE-STRUKTURISASI PAYLOAD GENERATE CONTENT GEMINI 2.5 FLASH
         let partsPayload = [];
-        
-        // Gabungkan instruksi pakar bersama prompt user di komponen teks utama
         const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan seluruh soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
         partsPayload.push({ text: `${instruksiPakar}\n\n${teksPrompt}` });
         
-        // Struktur inject base64 inlineData yang benar untuk Google API
         if (base64Image) {
           partsPayload.push({
             inlineData: {
@@ -519,16 +516,81 @@ ATURAN MUTLAK:
 
         const geminiData = await resGemini.json();
         
-        // Pengecekan error log response internal untuk memudahkan debugging jika API key bermasalah
+        // 🛠️ MENDETEKSI ERROR STATUS DARI GOOGLE API RESPONSES
         if (geminiData.error) {
-          hasilTugas = ``;
+          detailErrorSistem = `Google API Error (${geminiData.error.code || '400'}): ${geminiData.error.message}`;
         } else {
           hasilTugas = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          if (!hasilTugas) {
+            detailErrorSistem = "Struktur response kosong. Kemungkinan gambar diblokir oleh kebijakan keamanan konten (Safety Settings) Google.";
+          }
         }
         
       } catch (errApi) {
         console.error("Gemini Fetch Fatal Error:", errApi);
+        detailErrorSistem = `Network/Fetch Error: ${errApi.message}`;
       }
       
-      if (hasilTugas && !hasilTugas.startsWith("
-                                               
+      // JIKA HASIL VALID TERSEDIA DAN TIDAK ADA ERROR SISTEM
+      if (hasilTugas && !detailErrorSistem) {
+        await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
+        const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
+        
+        let htmlBersih = hasilTugas;
+        htmlBersih = htmlBersih.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        htmlBersih = htmlBersih.replace(/```html/gi, '').replace(/```/g, '');
+        
+        const ekstrakHtml = htmlBersih.match(/<h3[\s\S]*/i);
+        if (ekstrakHtml) {
+            htmlBersih = ekstrakHtml[0];
+        }
+        
+        const desainHtmlUtuh = `
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Kunci Jawaban & Pembahasan</title>
+            
+            <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+            <script>
+              window.MathJax = {
+                tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] }
+              };
+            </script>
+
+            <style>
+                /* FORMAT STABIL FILE NOMOR 24 - PUTIH BERSIH & AMAN DI HP */
+                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
+                h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
+                ul { padding-left: 20px; }
+                li { margin-bottom: 5px; }
+                p { margin-bottom: 12px; }
+                hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
+                b { color: #000; }
+                .MathJax { overflow-x: auto; overflow-y: hidden; }
+            </style>
+        </head>
+        <body>
+            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
+            ${htmlBersih}
+        </body>
+        </html>
+        `;
+
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Gemini AI`);
+      } else {
+        // 🔥 CETAK PESAN ERROR SEBENARNYA KE TELEGRAM
+        const cetakPesanGagal = detailErrorSistem || "Gemini AI memberikan balasan kosong tanpa indikasi status error.";
+        await kirimPesanTelegram(chatId, `❌ *Gagal memproses!*\n\n*Pesan Error Gemini:*\n\`${cetakPesanGagal}\``);
+      }
+    } // Penutup dari else if (aiPilihan === "tugas")
+    
+  } catch (error) {
+    console.error('Webhook handler error:', error);
+  }
+
+  return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
+} // Penutup akhir handler file
