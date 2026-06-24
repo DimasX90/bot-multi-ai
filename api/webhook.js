@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-        // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO)
+            // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - CACHE REDIS DIHAPUS TOTAL
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -460,10 +460,10 @@ export default async function handler(request) {
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Llama 4 Scout sedang menganalisis tugasmu...");
+      await kirimPesanTelegram(chatId, "⏳ Llama Vision AI sedang menganalisis tugasmu...");
       
       // 🔥 INSTRUKSI SUPER PREMIUM v6
-      const instruksiPakar = `Kamu adalah guru matematika formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
+      const instruksiPakar = `Kamu adalah guru matematika/sains formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
 
 Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali:
 
@@ -473,9 +473,9 @@ Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali
 <li><b>Ditanya:</b> [Singkat]</li>
 </ul>
 <p><b>Rumus Umum Matriks (Wajib Tulis Huruf/Simbol):</b><br>
-[Jelaskan teori dan WAJIB tulis RUMUS UMUM matriksnya menggunakan variabel huruf/trigonometri seperti sin, cos, a, b, x, y dengan LaTeX $...$ atau $$...$$. DI BAGIAN INI DILARANG KERAS MEMASUKKAN ANGKA DARI SOAL!]</p>
+[Jelaskan teori/rumus dasar menggunakan variabel huruf/simbol dengan LaTeX $...$ atau $$...$$. DI BAGIAN INI DILARANG KERAS MEMASUKKAN ANGKA DARI SOAL! Jika soal berupa fisika/sains, tulis rumus umum fisika teoritisnya di kotak ini.]</p>
 <p><b>Langkah Penyelesaian (Substitusi Angka):</b><br>
-[Tulis ulang matriksnya dan masukkan angka dari soal. Jabarkan hitungan baris demi baris menggunakan tag <br> setiap turun baris!]</p>
+[Tulis ulang rumusnya dan masukkan angka dari soal. Jabarkan hitungan baris demi baris menggunakan tag <br> setiap turun baris!]</p>
 <p><b>Jawaban Akhir:</b> [Kesimpulan]</p>
 <hr>
 
@@ -484,10 +484,9 @@ ATURAN MUTLAK:
 2. WAJIB gunakan format pmatrix LaTeX ($ atau $$) untuk matriks.
 3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \\times atau \\cdot.
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
-5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan jari-jari/pusat terlebih dahulu jika ada persamaan awal!`;
+5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
       
-      // 🔥 MENGGUNAKAN MODEL LLAMA 4 SCOUT SESUAI PERMINTAAN
-      const modelTugas = "meta-llama/llama-4-scout-17b-16e-instruct"; 
+      const modelTugas = "llama-3.2-11b-vision-preview"; 
       let pesanKirim = [];
 
       pesanKirim.push({ role: "system", content: instruksiPakar });
@@ -506,6 +505,7 @@ ATURAN MUTLAK:
         pesanKirim.push({ role: "user", content: pertanyaanClean });
       }
       
+      // Langsung panggil API Groq tanpa mengecek getRedis terlebih dahulu
       const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, 
@@ -573,10 +573,11 @@ ATURAN MUTLAK:
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama 4 Scout AI`);
+        // Langsung dikirim tanpa menyimpan hasil ke setRedis
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama Vision AI`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    }
-    
+    } // <-- Batas penutup blok tugas
+  
