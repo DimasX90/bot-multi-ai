@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH - MIGRASI UTUH GEMINI AI & KUNCI FORMAT AWAL FILE 24
+        // [G] MODE TUGAS SEKOLAH - FIX PAYLOAD FETCH GEMINI & KUNCI FORMAT STABIL FILE 24
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -489,101 +489,46 @@ ATURAN MUTLAK:
       let hasilTugas = "";
 
       try {
-        // 🔥 INTEGRASI RESMI GEMINI API VIA HTTP FETCH
-        let contentsPayload = [];
+        // 🔥 RE-STRUKTURISASI PAYLOAD GENERATE CONTENT GEMINI 2.5 FLASH
+        let partsPayload = [];
         
+        // Gabungkan instruksi pakar bersama prompt user di komponen teks utama
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan seluruh soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
+        partsPayload.push({ text: `${instruksiPakar}\n\n${teksPrompt}` });
+        
+        // Struktur inject base64 inlineData yang benar untuk Google API
         if (base64Image) {
-          const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
-          contentsPayload.push({
-            role: "user",
-            parts: [
-              { text: `${instruksiPakar}\n\n${teksPrompt}` },
-              {
-                inlineData: {
-                  mimeType: "image/jpeg",
-                  data: base64Image
-                }
-              }
-            ]
-          });
-        } else {
-          contentsPayload.push({
-            role: "user",
-            parts: [{ text: `${instruksiPakar}\n\n${pertanyaanClean}` }]
+          partsPayload.push({
+            inlineData: {
+              mimeType: "image/jpeg",
+              data: base64Image
+            }
           });
         }
 
         const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: contentsPayload })
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: partsPayload
+            }]
+          })
         });
 
         const geminiData = await resGemini.json();
-        hasilTugas = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
         
-      } catch (errApi) {
-        console.error("Gemini Error:", errApi);
-      }
-      
-      if (hasilTugas) {
-        await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
-        const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
-        
-        // 🔥 PEMOTONGAN PAKSA SUPER KETAT (REGEX DEWA SENSITIF HURUF BESAR/KECIL)
-        let htmlBersih = hasilTugas;
-        htmlBersih = htmlBersih.replace(/<think>[\s\S]*?<\/think>/gi, '');
-        htmlBersih = htmlBersih.replace(/```html/gi, '').replace(/```/g, '');
-        
-        const ekstrakHtml = htmlBersih.match(/<h3[\s\S]*/i);
-        if (ekstrakHtml) {
-            htmlBersih = ekstrakHtml[0];
+        // Pengecekan error log response internal untuk memudahkan debugging jika API key bermasalah
+        if (geminiData.error) {
+          hasilTugas = ``;
+        } else {
+          hasilTugas = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
         }
         
-        const desainHtmlUtuh = `
-        <!DOCTYPE html>
-        <html lang="id">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Kunci Jawaban & Pembahasan</title>
-            
-            <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-            <script>
-              window.MathJax = {
-                tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] }
-              };
-            </script>
-
-            <style>
-                /* 100% KEMBALI KAKU KE FORMAT AWAL FILE 24 (PUTIH BERSIH & AMAN DI HP) */
-                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
-                h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
-                ul { padding-left: 20px; }
-                li { margin-bottom: 5px; }
-                p { margin-bottom: 12px; }
-                hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
-                b { color: #000; }
-                .MathJax { overflow-x: auto; overflow-y: hidden; }
-            </style>
-        </head>
-        <body>
-            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
-            ${htmlBersih}
-        </body>
-        </html>
-        `;
-
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Gemini AI`);
-      } else {
-        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\nGemini AI tidak memberikan respon valid atau kuota key terganggu.`);
+      } catch (errApi) {
+        console.error("Gemini Fetch Fatal Error:", errApi);
       }
-    } // Penutup dari else if (aiPilihan === "tugas")
-    
-  } catch (error) {
-    console.error('Webhook handler error:', error);
-  }
-
-  return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
-} // Penutup akhir dari export default async function handler(req)
+      
+      if (hasilTugas && !hasilTugas.startsWith("
+                                               
