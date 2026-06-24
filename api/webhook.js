@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-            // [G] MODE TUGAS SEKOLAH - INTEGRASI GEMINI + TRANSPARANSI DETAIL ERROR LOGS
+                // [G] MODE TUGAS SEKOLAH - ALTERNATIF FIX VIA LLAMA 11B VISION & KUNCI STABIL FILE 24
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -460,7 +460,7 @@ export default async function handler(request) {
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Gemini AI sedang menganalisis tugas rumitmu, mohon tunggu sebentar...");
+      await kirimPesanTelegram(chatId, "⏳ Llama Vision AI sedang menganalisis tugas matematika/sains sekolahmu...");
       
       // 🔥 INSTRUKSI SUPER PREMIUM v6
       const instruksiPakar = `Kamu adalah guru matematika/sains formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
@@ -487,51 +487,50 @@ ATURAN MUTLAK:
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
       
       let hasilTugas = "";
-      let detailErrorSistem = ""; // Wadah penampung pesan error asli
+      let detailErrorSistem = "";
 
       try {
-        let partsPayload = [];
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan seluruh soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
-        partsPayload.push({ text: `${instruksiPakar}\n\n${teksPrompt}` });
+        let pesanKirimGroq = [{ role: "system", content: instruksiPakar }];
         
+        // Memasukkan gambar base64 dengan struktur Array Object yang valid untuk model Vision Groq
         if (base64Image) {
-          partsPayload.push({
-            inlineData: {
-              mimeType: "image/jpeg",
-              data: base64Image
-            }
+          const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
+          pesanKirimGroq.push({
+            role: "user",
+            content: [
+              { type: "text", text: teksPrompt },
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+            ]
           });
+        } else {
+          pesanKirimGroq.push({ role: "user", content: pertanyaanClean });
         }
 
-        const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        // 🔥 MENGGUNAKAN LLAMA 11B VISION (KUOTA LUAS & BISA MELIHAT GAMBAR)
+        const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
           body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: partsPayload
-            }]
+            model: "llama-3.2-11b-vision-preview", 
+            messages: pesanKirimGroq,
+            max_completion_tokens: 4096,
+            temperature: 0.4,
+            top_p: 0.95
           })
         });
 
-        const geminiData = await resGemini.json();
+        const groqData = await resGroq.json();
         
-        // 🛠️ MENDETEKSI ERROR STATUS DARI GOOGLE API RESPONSES
-        if (geminiData.error) {
-          detailErrorSistem = `Google API Error (${geminiData.error.code || '400'}): ${geminiData.error.message}`;
+        if (groqData.error) {
+          detailErrorSistem = `Groq Error: ${groqData.error.message}`;
         } else {
-          hasilTugas = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          if (!hasilTugas) {
-            detailErrorSistem = "Struktur response kosong. Kemungkinan gambar diblokir oleh kebijakan keamanan konten (Safety Settings) Google.";
-          }
+          hasilTugas = groqData.choices?.[0]?.message?.content || "";
         }
-        
-      } catch (errApi) {
-        console.error("Gemini Fetch Fatal Error:", errApi);
-        detailErrorSistem = `Network/Fetch Error: ${errApi.message}`;
+      } catch (errGroq) {
+        detailErrorSistem = `Exception: ${errGroq.message}`;
       }
-      
-      // JIKA HASIL VALID TERSEDIA DAN TIDAK ADA ERROR SISTEM
+
+      // PROSES PENCETAKAN HTML STANDARD FILE 24
       if (hasilTugas && !detailErrorSistem) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
@@ -562,7 +561,7 @@ ATURAN MUTLAK:
             </script>
 
             <style>
-                /* FORMAT STABIL FILE NOMOR 24 - PUTIH BERSIH & AMAN DI HP */
+                /* 100% KEMBALI KAKU KE FORMAT AWAL FILE 24 (PUTIH BERSIH & AMAN DI HP) */
                 body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
                 h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
@@ -580,11 +579,9 @@ ATURAN MUTLAK:
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Gemini AI`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama Vision AI`);
       } else {
-        // 🔥 CETAK PESAN ERROR SEBENARNYA KE TELEGRAM
-        const cetakPesanGagal = detailErrorSistem || "Gemini AI memberikan balasan kosong tanpa indikasi status error.";
-        await kirimPesanTelegram(chatId, `❌ *Gagal memproses!*\n\n*Pesan Error Gemini:*\n\`${cetakPesanGagal}\``);
+        await kirimPesanTelegram(chatId, `❌ *Gagal memproses!*\n\nDetail kendala sistem: \`${detailErrorSistem}\``);
       }
     } // Penutup dari else if (aiPilihan === "tugas")
     
@@ -594,3 +591,4 @@ ATURAN MUTLAK:
 
   return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
 } // Penutup akhir handler file
+          
