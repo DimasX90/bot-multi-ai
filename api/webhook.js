@@ -576,7 +576,7 @@ ATURAN MUTLAK:
                 hr { border: 0; border-top: 1px dashed #bbb; margin: 35px 0; }
                 b { color: #111; }
                 
-                /* Penyelarasan Font Rumus Matematika MathJax */
+                /* Penyelarasan Font & Batas Aman Rumus Matematika MathJax */
                 .MathJax, .MathJax_Display { 
                     font-size: 1.05em !important; 
                     color: #111 !important;
@@ -586,20 +586,25 @@ ATURAN MUTLAK:
                     margin: 4px 0;
                 }
                 
-                /* Trik CSS Murni untuk membuat kotak "Rumus Umum" otomatis rapi */
-                p b {
-                    color: #111;
+                /* 🔥 PERUBAHAN UTAMA: Kotak Teori Akurat Berdasarkan Teks Di Dalam Paragraf */
+                p {
+                    padding: 4px 0;
                 }
-                /* Memberikan aksen pemisah visual pada bagian teori */
-                p:nth-of-type(odd) {
+                
+                /* Jika di dalam paragraf terdapat penanda Rumus Umum, buat kotak pembungkus secara presisi */
+                p:has(b) {
+                    margin: 12px 0;
+                }
+                
+                /* Membuat pembeda visual global yang konsisten untuk komponen rumus */
+                h3 + ul + p {
                     background-color: #f8f9fa;
                     border-left: 4px solid #34495e;
-                    padding: 12px 16px;
+                    padding: 14px 18px !important;
                     border-radius: 4px;
-                    margin: 15px 0;
+                    margin: 18px 0 !important;
                 }
             </style>
-            
         </head>
         <body>
             <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
@@ -607,17 +612,4 @@ ATURAN MUTLAK:
         </body>
         </html>
         `;
-
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Qwen AI`);
-      } else {
-        const pesanError = groqData.error?.message || JSON.stringify(groqData);
-        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
-      }
-    } // Penutup dari else if (aiPilihan === "tugas")
-    
-  } catch (error) {
-    console.error('Webhook handler error:', error);
-  }
-
-  return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
-} // Penutup akhir dari export default async function handler(req)
+        
