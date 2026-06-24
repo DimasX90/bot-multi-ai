@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-        // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO)
+    // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO)
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -462,7 +462,7 @@ export default async function handler(request) {
       
       await kirimPesanTelegram(chatId, "⏳ Qwen AI sedang menganalisis tugasmu...");
       
-      // 🔥 INSTRUKSI SUPER PREMIUM v6 (Format Backtick Anti-Error)
+      // 🔥 INSTRUKSI SUPER PREMIUM v6
       const instruksiPakar = `Kamu adalah guru matematika formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
 
 Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali:
@@ -479,19 +479,21 @@ Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali
 <p><b>Jawaban Akhir:</b> [Kesimpulan]</p>
 <hr>
 
-ATURAN MUTLAK (JIKA DILANGGAR SISTEM AKAN ERROR):
+ATURAN MUTLAK:
 1. JANGAN gunakan markdown seperti # atau **.
 2. WAJIB gunakan format pmatrix LaTeX ($ atau $$) untuk matriks.
 3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \\times atau \\cdot.
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
-5. ANTI LOMPAT LOGIKA DASAR: Jika soal melibatkan persamaan awal (seperti lingkaran), JABARKAN cara mendapatkan jari-jari dan pusatnya terlebih dahulu!
-6. TANPA BASA-BASI (NO PREAMBLE): JANGAN PERNAH menulis kalimat rencana seperti "The user wants me to..." atau "Let's break down...". BALASAN PERTAMAMU HARUS LANGSUNG DIMULAI DENGAN TAG <h3>Soal... DAN HANYA BERISI KODE HTML!`;
+5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan jari-jari/pusat terlebih dahulu jika ada persamaan awal!`;
       
       const modelTugas = "qwen/qwen3.6-27b"; 
       let pesanKirim = [];
 
+      // 🔥 PERUBAHAN 1: Masukkan instruksi sebagai "SYSTEM" agar AI lebih patuh
+      pesanKirim.push({ role: "system", content: instruksiPakar });
+
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? (instruksiPakar + "Pertanyaan Tugas: " + pertanyaanClean) : (instruksiPakar + "Selesaikan semua soal pada gambar ini menggunakan struktur HTML rapi sesuai format yang diminta.");
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
         
         pesanKirim.push({
           role: "user",
@@ -501,7 +503,7 @@ ATURAN MUTLAK (JIKA DILANGGAR SISTEM AKAN ERROR):
           ]
         });
       } else {
-        pesanKirim.push({ role: "user", content: instruksiPakar + pertanyaanClean });
+        pesanKirim.push({ role: "user", content: pertanyaanClean });
       }
       
       const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
@@ -522,6 +524,18 @@ ATURAN MUTLAK (JIKA DILANGGAR SISTEM AKAN ERROR):
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
+        // 🔥 PERUBAHAN 2: PEMOTONGAN PAKSA (DEVELOPER TRICK)
+        let htmlBersih = hasilTugas;
+        const indexMulai = htmlBersih.indexOf("<h3"); // Cari tag H3 pertama
+        
+        if (indexMulai !== -1) {
+            // Potong dan buang semua teks basa-basi sebelum <h3>
+            htmlBersih = htmlBersih.substring(indexMulai); 
+        }
+        
+        // Buang tag markdown block ```html jika AI masih membawanya
+        htmlBersih = htmlBersih.replace(/```html/g, "").replace(/```/g, "").trim();
+        
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -530,8 +544,8 @@ ATURAN MUTLAK (JIKA DILANGGAR SISTEM AKAN ERROR):
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Kunci Jawaban & Pembahasan</title>
             
-            <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+            <script src="[https://polyfill.io/v3/polyfill.min.js?features=es6](https://polyfill.io/v3/polyfill.min.js?features=es6)"></script>
+            <script id="MathJax-script" async src="[https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js](https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js)"></script>
             <script>
               window.MathJax = {
                 tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] }
@@ -551,7 +565,7 @@ ATURAN MUTLAK (JIKA DILANGGAR SISTEM AKAN ERROR):
         </head>
         <body>
             <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
-            ${hasilTugas}
+            ${htmlBersih}
         </body>
         </html>
         `;
@@ -562,10 +576,4 @@ ATURAN MUTLAK (JIKA DILANGGAR SISTEM AKAN ERROR):
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
     } // <-- Batas penutup blok tugas
-    
-  } catch (error) {
-    console.error('Error:', error);
-  }
   
-  return new Response('OK', { status: 200 });
-} // <-- PENUTUP FUNGSI UTAMA (Sangat penting agar Vercel tidak Error!)
