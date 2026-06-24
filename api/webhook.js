@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-        // [G] MODE TUGAS SEKOLAH - FORMAT AWAL FILE 24 & BEBAS ERROR REASONING LLAMA
+    // [G] MODE TUGAS SEKOLAH - FORMAT STABIL FILE 24 & STRUKTUR TEKS MURNI AMAN LLAMA 70B
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -463,7 +463,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "⏳ Llama AI sedang menganalisis tugasmu dengan kapasitas penuh...");
       
       // 🔥 INSTRUKSI SUPER PREMIUM v6
-      const instruksiPakar = `Kamu adalah guru matematika/sains formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
+      const instruksiPakar = `Kamu adalah guru matematika/sains formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG DIBERIKAN SECARA BERURUTAN!
 
 Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali:
 
@@ -491,16 +491,10 @@ ATURAN MUTLAK:
 
       pesanKirim.push({ role: "system", content: instruksiPakar });
 
+      // 🔥 FIX UTAMA: Mengonversi isi content menjadi string murni agar Llama 70B tidak error
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
-        
-        pesanKirim.push({
-          role: "user",
-          content: [
-            { type: "text", text: teksPrompt },
-            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-          ]
-        });
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan dan selesaikan soal matematika/sains yang diberikan sesuai format HTML wajib sistem.";
+        pesanKirim.push({ role: "user", content: teksPrompt });
       } else {
         pesanKirim.push({ role: "user", content: pertanyaanClean });
       }
@@ -514,7 +508,6 @@ ATURAN MUTLAK:
           max_completion_tokens: 4096,
           temperature: 0.5,
           top_p: 0.95
-          // 🔥 Parameter reasoning_effort dihapus total agar Llama 70B berjalan mulus tanpa error
         })
       });
       
@@ -581,5 +574,4 @@ ATURAN MUTLAK:
   }
 
   return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
-} 
-                  
+} // Penutup akhir dari export default async function handler(req)
