@@ -486,7 +486,7 @@ ATURAN MUTLAK:
 4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
 5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
       
-      const modelTugas = "qwen/qwen3.6-27b"; 
+      const modelTugas = "llama-3.3-70b-versatile"; 
       let pesanKirim = [];
 
       pesanKirim.push({ role: "system", content: instruksiPakar });
