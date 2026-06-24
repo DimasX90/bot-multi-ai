@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-            // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - REASONING NONE & DESAIN LAYAR HP STABIL
+                // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - FORMAT DESAIN AWAL LAYAR HP
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -514,7 +514,7 @@ ATURAN MUTLAK:
           max_completion_tokens: 4096,
           temperature: 0.6,
           top_p: 0.95,
-          reasoning_effort: "none" // Mengunci respons instan Qwen tanpa <think>
+          reasoning_effort: "none" // Mengunci respon instan Qwen tanpa <think>
         })
       });
       
@@ -552,35 +552,15 @@ ATURAN MUTLAK:
             </script>
 
             <style>
-                /* KEMBALI KE DESAIN AWAL YANG RINGAN DAN AMAN UNTUK LAYAR HP */
-                body { 
-                    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-                    line-height: 1.5; 
-                    padding: 14px; 
-                    color: #222; 
-                    max-width: 800px; 
-                    margin: 0 auto; 
-                    font-size: 16px; 
-                }
-                h3 { 
-                    color: #2c3e50; 
-                    border-bottom: 2px solid #3498db; 
-                    padding-bottom: 8px; 
-                    margin-top: 30px; 
-                }
+                /* 🔥 KEMBALI 100% KE STRUKTUR DESAIN AWAL (REFERENSI FILE 24) */
+                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
+                h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
                 li { margin-bottom: 5px; }
                 p { margin-bottom: 12px; }
                 hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
                 b { color: #000; }
-                
-                /* Mencegah rumus matriks/panjang merusak layout lebar layar HP */
-                .MathJax, .MathJax_Display { 
-                    overflow-x: auto !important; 
-                    overflow-y: hidden !important; 
-                    display: inline-block;
-                    max-width: 100%;
-                }
+                .MathJax { overflow-x: auto; overflow-y: hidden; }
             </style>
         </head>
         <body>
@@ -603,4 +583,3 @@ ATURAN MUTLAK:
 
   return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
 }
-    
