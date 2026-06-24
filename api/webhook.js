@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - CACHE REDIS DIHAPUS TOTAL
+        // [G] MODE TUGAS SEKOLAH (MENDUKUNG TEKS & FOTO) - TANPA REDIS & RESOLUSI BARU
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -505,7 +505,6 @@ ATURAN MUTLAK:
         pesanKirim.push({ role: "user", content: pertanyaanClean });
       }
       
-      // Langsung panggil API Groq tanpa mengecek getRedis terlebih dahulu
       const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, 
@@ -526,14 +525,9 @@ ATURAN MUTLAK:
         
         // 🔥 PEMOTONGAN PAKSA SUPER KETAT (REGEX DEWA)
         let htmlBersih = hasilTugas;
-        
-        // 1. Musnahkan tag <think> dan SELURUH isinya sampai akar
         htmlBersih = htmlBersih.replace(/<think>[\s\S]*?<\/think>/gi, '');
-        
-        // 2. Buang tag markdown block ```html
         htmlBersih = htmlBersih.replace(/```html/gi, '').replace(/```/g, '');
         
-        // 3. Ekstrak PAKSA hanya teks yang dimulai dari <h3> sampai bawah
         const ekstrakHtml = htmlBersih.match(/<h3[\s\S]*/i);
         if (ekstrakHtml) {
             htmlBersih = ekstrakHtml[0];
@@ -547,8 +541,8 @@ ATURAN MUTLAK:
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Kunci Jawaban & Pembahasan</title>
             
-            <script src="[https://polyfill.io/v3/polyfill.min.js?features=es6](https://polyfill.io/v3/polyfill.min.js?features=es6)"></script>
-            <script id="MathJax-script" async src="[https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js](https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js)"></script>
+            <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
             <script>
               window.MathJax = {
                 tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] }
@@ -573,10 +567,16 @@ ATURAN MUTLAK:
         </html>
         `;
 
-        // Langsung dikirim tanpa menyimpan hasil ke setRedis
         await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama Vision AI`);
       } else {
         const pesanError = groqData.error?.message || JSON.stringify(groqData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
-    }
+    } // Penutup blok tugas
+    
+  } catch (error) {
+    console.error('Webhook handler error:', error);
+  }
+
+  return new Response(JSON.stringify({ status: 'error_global_handled' }), { status: 200 });
+} 
