@@ -552,15 +552,54 @@ ATURAN MUTLAK:
             </script>
 
             <style>
-                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
-                h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
-                ul { padding-left: 20px; }
-                li { margin-bottom: 5px; }
-                p { margin-bottom: 12px; }
-                hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
-                b { color: #000; }
-                .MathJax { overflow-x: auto; overflow-y: hidden; }
+                body { 
+                    font-family: 'Georgia', 'Times New Roman', Times, serif; 
+                    line-height: 1.6; 
+                    padding: 24px; 
+                    color: #2c3e50; 
+                    max-width: 800px; 
+                    margin: 0 auto; 
+                    font-size: 16px; 
+                    background-color: #fafbfc;
+                }
+                h3 { 
+                    font-family: 'Georgia', serif;
+                    color: #1a252f; 
+                    border-bottom: 2px solid #34495e; 
+                    padding-bottom: 8px; 
+                    margin-top: 40px;
+                    font-size: 20px;
+                }
+                ul { padding-left: 22px; margin-bottom: 15px; }
+                li { margin-bottom: 6px; }
+                p { margin-bottom: 14px; text-align: justify; }
+                hr { border: 0; border-top: 1px dashed #bbb; margin: 35px 0; }
+                b { color: #111; }
+                
+                /* Penyelarasan Font Rumus Matematika MathJax */
+                .MathJax, .MathJax_Display { 
+                    font-size: 1.05em !important; 
+                    color: #111 !important;
+                    overflow-x: auto; 
+                    overflow-y: hidden; 
+                    padding: 6px 0;
+                    margin: 4px 0;
+                }
+                
+                /* Trik CSS Murni untuk membuat kotak "Rumus Umum" otomatis rapi */
+                p b {
+                    color: #111;
+                }
+                /* Memberikan aksen pemisah visual pada bagian teori */
+                p:nth-of-type(odd) {
+                    background-color: #f8f9fa;
+                    border-left: 4px solid #34495e;
+                    padding: 12px 16px;
+                    border-radius: 4px;
+                    margin: 15px 0;
+                }
             </style>
+            
         </head>
         <body>
             <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
