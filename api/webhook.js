@@ -411,7 +411,72 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [8] MODE ANALISA TUGAS SEKOLAH - PROMPT PAKAR + HTML AWAL + PENYESUAIAN AI (MARKED.JS - SUDAH DIPERBAIKI)
+        // [6] MODE NVIDIA VISION
+    else if (aiPilihan === "nano") {
+      const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
+      await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang menganalisis pesan...");
+      let riwayatNano = [];
+
+      if (isImage && base64Image) {
+        let konten = [
+          { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
+          { type: "text", text: pertanyaanClean }
+        ];
+
+        try {
+          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
+            body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: [{ role: "user", content: konten }], max_tokens: 700 })
+          });
+          
+          const data = await res.json();
+          const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
+          if (!jawaban.startsWith("⚠️")) {
+            riwayatNano.push({ role: "user", content: `[Melihat Gambar]: ${pertanyaanClean}` });
+            riwayatNano.push({ role: "assistant", content: jawaban });
+            await setRedis(`memori_nano_${chatId}`, riwayatNano);
+          }
+          await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
+        } catch (err) {
+          await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan atau timeout saat membaca gambar.");
+        }
+      } 
+      else {
+        riwayatNano = await getRedis(`memori_nano_${chatId}`) || [];
+        riwayatNano.push({ role: "user", content: pertanyaanClean });
+
+        try {
+          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
+            body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: riwayatNano, max_tokens: 700 })
+          });
+          
+          const data = await res.json();
+          const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
+          if (!jawaban.startsWith("⚠️")) {
+            riwayatNano.push({ role: "assistant", content: jawaban });
+            if (riwayatNano.length > 8) riwayatNano = riwayatNano.slice(-8);
+            await setRedis(`memori_nano_${chatId}`, riwayatNano);
+          }
+          await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
+        } catch (err) {
+          await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan saat memproses obrolan teks.");
+        }
+      }
+    }
+      
+    // [7] MODE PENCARIAN GAMBAR PEXELS
+    else if (aiPilihan === "gambar") {
+      const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
+      if (!promptGambar) return;
+      await kirimPesanTelegram(chatId, "⏳ Mencari foto...");
+      const resPexels = await (await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1`, { headers: { "Authorization": "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq" } })).json();
+      if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
+    }
+
+    // [8] MODE ANALISA TUGAS SEKOLAH - FIX ANTI-LOOP & MATRIKS SEMPURNA
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
@@ -422,14 +487,14 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       
       await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas sekolahmu...");
       
-      // 🔥 PROMPT PAKAR & KURIKULUM SMA
-      const instruksiPakar = `Bertindaklah sebagai pakar pendidikan dan guru sekolah yang berpengalaman. Jawab disesuaikan dengan kurikulum SMA. Kerjakan soal yang diberikan selangkah demi selangkah agar mudah dipahami oleh siswa. WAJIB bungkus semua rumus dan angka matematika dengan simbol $...$ atau $$...$$.`;
+      // 🔥 PROMPT DIPERTINGGI: ANTI-LOOP + ATURAN TEGAS MATRIKS JAVASCRIPT
+      const instruksiPakar = `Bertindaklah sebagai pakar pendidikan dan guru matematika/sains SMA yang sangat teliti. Jawab wajib disesuaikan dengan kurikulum SMA. Kerjakan seluruh soal secara runut langkah demi langkah. Berikan jawaban akhir yang jelas secara langsung dan DILARANG Keras mengulang-ulang kalimat kesimpulan yang sama di akhir teks agar tidak terjadi looping teks. WAJIB bungkus semua rumus, simbol, matriks, dan angka matematika dengan simbol $...$ atau $$...$$.`;
       
       const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
 
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan soal pada gambar ini.";
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan semua soal pada gambar ini secara lengkap.";
         pesanKirim.push({
           role: "user",
           content: [
@@ -451,8 +516,8 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
           model: modelTugas, 
           messages: pesanKirim,
           max_tokens: 4100,      
-          temperature: 0.60,      
-          top_p: 0.95,            
+          temperature: 0.15,      // 🔥 TURUNKAN KE 0.15 AGAR JAWABAN PASTI, RUMUS AKURAT, & TIDAK GAGAP/LOOPING
+          top_p: 0.90,            
           stream: false           
         })
       });
@@ -462,22 +527,24 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       
       if (hasilTugas) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
-        const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
+        const namaFileHasil = base64Image ? "Analisis_Soal_Lengkap.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
+        // 🔥 AMANKAN FORMAT DAN DOBEL KAN KARAKTER BACKSLASH AGAR MATRIKS TIDAK TERTELAN JAVASCRIPT
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
-        
+            .replace(/>/g, "&gt;")
+            .replace(/\\/g, "\\\\"); // Mengunci semua tanda miring matematika agar utuh sampai ke browser
+
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Kunci Jawaban & Pembahasan</title>
+            <title>Kunci Jawaban & Pembahasan SMA</title>
             
             <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
             <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
@@ -496,38 +563,36 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
             <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
             <style>
-                /* DESAIN CSS AWAL YANG KAMU MINTA */
-                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
-                h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
-                ul { padding-left: 20px; }
-                li { margin-bottom: 5px; }
-                p { margin-bottom: 12px; }
-                hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
-                b { color: #000; }
-                /* Agar rumus panjang bisa digeser ke samping di HP */
-                .MathJax { overflow-x: auto; overflow-y: hidden; }
+                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 25px; color: #222; max-width: 850px; margin: 0 auto; font-size: 16px; background-color: #f9f9f9; }
+                .container-box { background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+                h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 12px; margin-bottom: 25px; }
+                h3 { color: #34495e; margin-top: 25px; }
+                ul, ol { padding-left: 22px; }
+                li { margin-bottom: 6px; }
+                p { margin-bottom: 14px; text-align: justify; }
+                hr { border: 0; border-top: 1px solid #eee; margin: 25px 0; }
+                b { color: #111; }
+                .MathJax { overflow-x: auto; overflow-y: hidden; font-size: 105%; }
             </style>
         </head>
         <body>
-            <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
-            
-            <textarea id="raw-markdown" style="display: none;">${amanUntukHtml}</textarea>
-            <div id="content"></div>
-            
+            <div class="container-box">
+                <h2 style="text-align: center;">📄 Kunci Jawaban & Pembahasan Lengkap</h2>
+                <textarea id="raw-markdown" style="display: none;">${amanUntukHtml}</textarea>
+                <div id="content"></div>
+            </div>
         </body>
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Nvidia Llama Vision`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil pembahasan matematika kurikulum SMA`);
       } else {
         const pesanError = nvidiaData.error?.message || JSON.stringify(nvidiaData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Nvidia:*\n\`${pesanError}\``);
       }
     }
 
-  // 🔥 KURUNG PENUTUP UNTUK BLOK TRY & FUNGSI LATAR BELAKANG
   } catch (error) {
     console.error('Error in background execution:', error);
   }
 }
-        
