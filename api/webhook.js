@@ -14,9 +14,9 @@ const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 // =======================================================
 
-// 🔥 GEMBOK REDIS
+// 🔥 KEMBALIKAN FUNGSI SET REDIS
 async function setRedis(key, value) {
-  await fetch(`${UPSTASH_REST_URL}/set/${key}?EX=600`, {
+  await fetch(`${UPSTASH_REST_URL}/set/${key}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${UPSTASH_REST_TOKEN}` },
     body: JSON.stringify(value),
