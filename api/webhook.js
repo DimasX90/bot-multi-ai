@@ -455,7 +455,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas sekolahmu...");
       
       // 🔥 PROMPT PAKAR & KURIKULUM SMA
-      const instruksiPakar = `Bertindaklah sebagai pakar pendidikan dan guru sekolah yang berpengalaman. Jawab disesuaikan dengan kurikulum SMA. Kerjakan soal yang diberikan selangkah demi selangkah agar mudah dipahami oleh siswa. WAJIB bungkus semua rumus dan angka matematika dengan simbol $...$ atau $$...$$.`;
+      const instruksiPakar = `Bertindaklah sebagai pakar pendidikan dan guru sekolah yang berpengalaman. Jawab disesuaikan dengan kurikulum SMA. WAJIB bungkus semua rumus dan angka matematika dengan simbol $...$ atau $$...$$.`;
       
       const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
