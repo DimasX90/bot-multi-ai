@@ -244,7 +244,7 @@ export default async function handler(request) {
 
     // Peringatan jika belum pilih AI
     if (!aiPilihan) {
-      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@AnalisaTugas\` (kirim foto)");
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@analisatugas\` (kirim foto)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
