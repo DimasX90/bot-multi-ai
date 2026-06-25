@@ -14,7 +14,7 @@ const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 // =======================================================
 
-// 🔥 GEMBOK REDIS (Otomatis hilang dalam 10 menit agar database tidak penuh)
+// 🔥 GEMBOK REDIS
 async function setRedis(key, value) {
   await fetch(`${UPSTASH_REST_URL}/set/${key}?EX=600`, {
     method: 'POST',
@@ -31,26 +31,7 @@ async function getRedis(key) {
   return data.result ? JSON.parse(data.result) : null;
 }
 
-// ================= FUNGSI UTAMA BOT =================
-export default async function handler(request) {
-  if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
-
-  try {
-    const data = await request.json();
-    
-    // 🔥 GEMBOK ANTI-SPAM BEKERJA DI SINI
-    const updateId = data.update_id;
-    if (updateId) {
-      const cekPesanGanda = await getRedis(`pesan_${updateId}`);
-      if (cekPesanGanda) {
-        return new Response(JSON.stringify({ status: 'ignored_duplicate' }), { status: 200 });
-      }
-      await setRedis(`pesan_${updateId}`, "sedang diproses");
-    }
-
-    const messageData = data.message || {};
-    // ... (SISA KODE KE BAWAH BIARKAN SAMA SEPERTI SEBELUMNYA) ...
-    
+// 🔥 FUNGSI BANTUAN
 async function cariDiInternet(query) {
   try {
     const response = await fetch("https://api.tavily.com/search", {
@@ -163,7 +144,6 @@ async function kirimFotoTelegramURL(chatId, urlFoto, caption) {
 async function kirimDokumenHtmlTelegram(chatId, kontenHtml, namaFile, caption) {
   const formData = new FormData();
   formData.append('chat_id', chatId);
-  // Mengubah teks HTML dari AI menjadi file fisik
   formData.append('document', new Blob([kontenHtml], { type: 'text/html' }), namaFile);
   if (caption) formData.append('caption', caption);
 
@@ -171,27 +151,23 @@ async function kirimDokumenHtmlTelegram(chatId, kontenHtml, namaFile, caption) {
     method: 'POST',
     body: formData
   });
-}
-
+                                    }
+// ================= FUNGSI UTAMA BOT =================
 export default async function handler(request) {
   if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
   try {
     const data = await request.json();
     
-    // 🔥 UBAH LOGIKA SPAM-NYA DI SINI (Ganti bagian hitCount dengan ini)
+    // 🔥 GEMBOK ANTI-SPAM
     const updateId = data.update_id;
     if (updateId) {
-      // Cek apakah ID pesan ini sudah pernah masuk sebelumnya
       const cekPesanGanda = await getRedis(`pesan_${updateId}`);
       if (cekPesanGanda) {
-        // Jika sudah ada, langsung suruh Vercel diam dan abaikan pesan ini
         return new Response(JSON.stringify({ status: 'ignored_duplicate' }), { status: 200 });
       }
-      // Jika belum ada, catat ID pesan ini ke Redis agar tidak dikerjakan dua kali
       await setRedis(`pesan_${updateId}`, "sedang diproses");
     }
-    // 🔥 BATAS PERUBAHAN. KODE DI BAWAH INI BIARKAN TETAP SAMA
 
     const messageData = data.message || {};
     const chatId = messageData.chat?.id;
@@ -229,9 +205,8 @@ export default async function handler(request) {
                          `📸 *@nano [foto]* -> NVIDIA Vision khusus pembaca gambar\n` +
                          `🎨 *@gambar [prompt]* -> Cari foto berkualitas tinggi via Pexels\n` +
                          `✨ *@edit [foto]* -> Perbagus foto dengan AI Racikan Kustom\n` +
-                         `📝 *@tugas [soal/foto]* -> Asisten cerdas tugas sekolah & bedah matematika (Cetak Dokumen)\n\n` +
-                         `  _(Efek: terang, tajam, warna, bersih, bersih kontras, semua, semua kontras)_\n\n` +
-                         `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@edit semua\``;
+                         `📝 *@tugas [soal/foto]* -> Asisten cerdas tugas sekolah & bedah matematika\n\n` +
+                         `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@tugas kerjakan\``;
                          
       await kirimPesanTelegram(chatId, teksSambut);
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
@@ -258,7 +233,7 @@ export default async function handler(request) {
     let aiPilihan = await getRedis(`sesi_${chatId}`);
 
     if (!aiPilihan) {
-      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@edit\` (kirim foto)");
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@tugas\` (kirim foto)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
@@ -270,7 +245,6 @@ export default async function handler(request) {
       if (resFile.ok) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
         imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
-        // PERUBAHANNYA ADA DI BARIS BAWAH INI (Tambahkan: || aiPilihan === "tugas")
         if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "tugas") {
           base64Image = Buffer.from(imageBuffer).toString('base64');
         }
@@ -328,9 +302,8 @@ export default async function handler(request) {
           await setRedis(`memori_gemini_${chatId}`, memoriMentah.slice(-6));
       }
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
-    }
-
-    else if (aiPilihan === "search") {
+                                       }
+        else if (aiPilihan === "search") {
       const kueriPencarian = pesanUser.replace(/@search|\/search/gi, '').trim();
       if (!kueriPencarian) {
         await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian. Contoh: \`@search berita sepak bola hari ini\`");
@@ -470,7 +443,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-                // [G] MODE TUGAS SEKOLAH - PROMPT SIMPLE + HTML AWAL + PENYESUAIAN AI (MARKED.JS)
+    // [G] MODE TUGAS SEKOLAH - PROMPT SIMPLE + HTML AWAL + PENYESUAIAN AI (MARKED.JS)
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -525,13 +498,11 @@ export default async function handler(request) {
         
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
-        // Fitur penyesuaian teks agar AI tidak merusak kode HTML
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
         
-        // 🔥 DESAIN CSS AWAL KAMU + FITUR PENYESUAIAN OTOMATIS MARKED.JS
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -584,5 +555,14 @@ export default async function handler(request) {
         const pesanError = nvidiaData.error?.message || JSON.stringify(nvidiaData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Nvidia:*\n\`${pesanError}\``);
       }
-    } // Penutup dari else if (aiPilihan === "tugas")
+    }
+
+  // 🔥 PENUTUP CATCH YANG HILANG SEBELUMNYA
+  } catch (error) {
+    console.error('Webhook handler error:', error);
+  }
   
+  // 🔥 KODE RESPON AKHIR AGAR SERVER VERCEL TIDAK MENGGANTUNG
+  return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
+        }
+                                  
