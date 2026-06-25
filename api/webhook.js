@@ -453,7 +453,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-            // [G] MODE TUGAS SEKOLAH - ADAPTASI MARKDOWN LLAMA VISION 11B (PALING STABIL)
+                // [G] MODE TUGAS SEKOLAH - PROMPT SIMPLE + HTML AWAL + PENYESUAIAN AI (MARKED.JS)
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -464,19 +464,14 @@ export default async function handler(request) {
       
       await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas matematika/sains sekolahmu...");
       
-      // 🔥 PROMPT BARU: BEBASKAN AI MENGGUNAKAN MARKDOWN (LEBIH CEPAT & CERDAS)
-      const instruksiPakar = `Bertindaklah sebagai guru matematika SMA yang berpengalaman.
-ATURAN WAJIB:
-1. Kerjakan SEMUA soal yang diberikan selengkap mungkin, JANGAN ADA YANG DI-SKIP.
-2. Gunakan format Markdown standar (Gunakan ** untuk teks tebal, # atau ## untuk judul/nomor soal).
-3. WAJIB membungkus semua rumus, angka, dan variabel matematika dengan simbol LaTeX ($...$ untuk sebaris, $$...$$ untuk baris baru).
-4. Berikan langkah-langkah penyelesaian secara urut dan jelas.`;
+      // 🔥 PROMPT SUPER SIMPEL (Sesuai Permintaanmu)
+      const instruksiPakar = `Bertindaklah sebagai guru matematika SMA. Kerjakan soal yang diberikan dan sesuaikan dengan kurikulum SMA. Berikan langkah-langkah penyelesaiannya. WAJIB bungkus semua rumus dan angka dengan simbol $...$ atau $$...$$.`;
       
       const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
 
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan semua soal pada gambar ini satu per satu secara detail.";
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan soal pada gambar ini.";
         pesanKirim.push({
           role: "user",
           content: [
@@ -513,13 +508,13 @@ ATURAN WAJIB:
         
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
-        // Mencegah kode dari AI merusak struktur HTML file kita
+        // Fitur penyesuaian teks agar AI tidak merusak kode HTML
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
         
-        // 🔥 DESAIN HTML BARU: DITAMBAH MARKED.JS (PENERJEMAH MARKDOWN OTOMATIS)
+        // 🔥 DESAIN CSS AWAL KAMU + FITUR PENYESUAIAN OTOMATIS MARKED.JS
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -529,53 +524,45 @@ ATURAN WAJIB:
             <title>Kunci Jawaban & Pembahasan</title>
             
             <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-            
             <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
             <script>
               window.MathJax = {
                 tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] },
                 startup: {
                   pageReady: () => {
-                    // 1. Ambil teks asli dari AI
                     const rawMarkdown = document.getElementById('raw-markdown').value;
-                    // 2. Ubah Markdown menjadi desain HTML lalu tampilkan
                     document.getElementById('content').innerHTML = marked.parse(rawMarkdown);
-                    // 3. Render rumus matematika agar rapi
                     return MathJax.typesetPromise(document.getElementById('content'));
                   }
                 }
               };
             </script>
-            <script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
+            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
             <style>
-                /* TEMPLATE FILE 24 (PUTIH BERSIH & MEWAH) */
-                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; padding: 15px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
-                h1, h2, h3, h4 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
-                ul, ol { padding-left: 20px; }
-                li { margin-bottom: 8px; }
+                /* DESAIN CSS AWAL YANG KAMU MINTA */
+                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
+                h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
+                ul { padding-left: 20px; }
+                li { margin-bottom: 5px; }
                 p { margin-bottom: 12px; }
                 hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
-                b, strong { color: #000; }
+                b { color: #000; }
+                /* Agar rumus panjang bisa digeser ke samping di HP */
                 .MathJax { overflow-x: auto; overflow-y: hidden; }
-                
-                /* Tambahan style jika AI memunculkan tabel */
-                table { border-collapse: collapse; width: 100%; margin-bottom: 15px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
             </style>
         </head>
         <body>
             <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
             
             <textarea id="raw-markdown" style="display: none;">${amanUntukHtml}</textarea>
-            
             <div id="content"></div>
+            
         </body>
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis Llama Vision (Markdown Optimized)`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Nvidia Llama Vision`);
       } else {
         const pesanError = nvidiaData.error?.message || JSON.stringify(nvidiaData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Nvidia:*\n\`${pesanError}\``);
