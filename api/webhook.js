@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH - MURNI LLAMA VISION 11B VIA ENDPOINT NVIDIA AI CATALOG
+        // [G] MODE TUGAS SEKOLAH - MURNI LLAMA VISION 11B VIA ENDPOINT NVIDIA AI CATALOG (PROMPT IN USER)
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -476,20 +476,22 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
       const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
 
-      pesanKirim.push({ role: "system", content: instruksiPakar });
-
-      // 🔥 STRUKTUR PAYLOAD SERAGAM (Llama Vision wajib menerima struktur objek khusus ini jika ada gambar)
+      // 🔥 ROLE SYSTEM DIHAPUS - KITA PAKSA INSTRUKSI MASUK KE ROLE USER AGAR DIPATUHI
+      
+      // 🔥 STRUKTUR PAYLOAD SERAGAM DENGAN INSTRUKSI GABUNGAN
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan seluruh soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan seluruh soal pada gambar ini sesuai instruksi.";
         pesanKirim.push({
           role: "user",
           content: [
-            { type: "text", text: teksPrompt },
+            // MENGGABUNGKAN INSTRUKSI PAKAR DAN SOAL AGAR AI TIDAK BISA MENGABAIKANNYA
+            { type: "text", text: `${instruksiPakar}\n\nPerintah Tambahan: ${teksPrompt}` },
             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
           ]
         });
       } else {
-        pesanKirim.push({ role: "user", content: pertanyaanClean });
+        // MENGGABUNGKAN INSTRUKSI PAKAR UNTUK TEKS MURNI
+        pesanKirim.push({ role: "user", content: `${instruksiPakar}\n\nSoal: ${pertanyaanClean}` });
       }
       
       // Menggunakan struktur fetch biasa di bot kamu dengan parameter presisi pilihanmu
