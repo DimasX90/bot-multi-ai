@@ -1,3 +1,6 @@
+// 🔥 TAMBAHKAN BARIS INI DI PALING ATAS
+export const maxDuration = 60;
+
 export const config = {
   runtime: 'edge',
 };
