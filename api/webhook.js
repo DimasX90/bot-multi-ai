@@ -206,7 +206,7 @@ export default async function handler(request) {
                          `🎨 *@gambar [prompt]* -> Cari foto berkualitas tinggi via Pexels\n` +
                          `✨ *@edit [foto]* -> Perbagus foto dengan AI Racikan Kustom\n` +
                          `📝 *@analisatugas [soal/foto]* -> Asisten cerdas tugas sekolah & bedah matematika\n\n` +
-                         `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@tugas kerjakan\``;
+                         `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@analisatugas kerjakan\``;
                          
       await kirimPesanTelegram(chatId, teksSambut);
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
