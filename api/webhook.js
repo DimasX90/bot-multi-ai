@@ -543,11 +543,11 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       
       await kirimPesanTelegram(chatId, "⏳ Groq Vision sedang melakukan Deep Reasoning pada soalmu...");
       
-      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains SMA yang sangat akurat. Tugasmu:
+      const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA yang sangat akurat. Tugasmu:
 1. Selesaikan soal pada gambar secara terstruktur sesuai tingkat kurikulum SMA.
 2. Jika ada materi transformasi geometri (refleksi, rotasi, translasi, dilatasi), kamu WAJIB menuliskan rumus koordinat bakunya terlebih dahulu (misal rumus refleksi garis $y=k$ adalah $y' = 2k - y$) sebelum melakukan substitusi angka.
 3. Berikan pembahasan runut dan langsung ke inti rumus/perhitungan tanpa membuat kalimat penjelasan yang rancu.
-4. Tuliskan jawaban akhir sekali saja secara ringkas di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
+4. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
 Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan $$...$$.`;
       
       let pesanKirim = [];
