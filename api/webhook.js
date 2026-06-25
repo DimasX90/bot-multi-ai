@@ -453,11 +453,10 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-        // [G] MODE TUGAS SEKOLAH - MURNI LLAMA VISION 11B VIA ENDPOINT NVIDIA AI CATALOG (PROMPT IN USER)
+            // [G] MODE TUGAS SEKOLAH - ADAPTASI MARKDOWN LLAMA VISION 11B (PALING STABIL)
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
-      // 🔥 KUNCI PINDAH SALURAN
       if (!pertanyaanClean && !base64Image) {
         await kirimPesanTelegram(chatId, "📝 *Saluran Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
@@ -465,54 +464,43 @@ export default async function handler(request) {
       
       await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas matematika/sains sekolahmu...");
       
-      // 🔥 PROMPT STRUKTUR GURU MATEMATIKA RACIKAN KAMU
-      const instruksiPakar = `Bertindaklah sebagai guru matematika SMA yang berpengalaman. Untuk setiap soal yang saya berikan:
-1. Tuliskan rumus umum yang relevan sesuai kurikulum (Wajib menggunakan huruf/simbol tanpa angka soal).
-2. Jelaskan langkah penyelesaian secara detail (step-by-step) menjabarkan hitungan baris demi baris menggunakan tag <br> setiap turun baris.
-3. Tampilkan substitusi angka ke dalam rumus dengan jelas.
-4. Gunakan format matematika yang rapi menggunakan LaTeX $...$ atau $$...$$.
-5. Berikan kesimpulan akhir atau jawaban akhir yang tegas di bagian paling bawah.
-
-DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan tag HTML (<h3>, <ul>, <li>, <p>, <br>).`;
+      // 🔥 PROMPT BARU: BEBASKAN AI MENGGUNAKAN MARKDOWN (LEBIH CEPAT & CERDAS)
+      const instruksiPakar = `Bertindaklah sebagai guru matematika SMA yang berpengalaman.
+ATURAN WAJIB:
+1. Kerjakan SEMUA soal yang diberikan selengkap mungkin, JANGAN ADA YANG DI-SKIP.
+2. Gunakan format Markdown standar (Gunakan ** untuk teks tebal, # atau ## untuk judul/nomor soal).
+3. WAJIB membungkus semua rumus, angka, dan variabel matematika dengan simbol LaTeX ($...$ untuk sebaris, $$...$$ untuk baris baru).
+4. Berikan langkah-langkah penyelesaian secara urut dan jelas.`;
       
-      // Murni menggunakan satu model vision untuk semua skenario (Foto & Teks)
       const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
 
-      // 🔥 ROLE SYSTEM DIHAPUS - KITA PAKSA INSTRUKSI MASUK KE ROLE USER AGAR DIPATUHI
-      
-      // 🔥 STRUKTUR PAYLOAD SERAGAM DENGAN INSTRUKSI GABUNGAN
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan seluruh soal pada gambar ini sesuai instruksi.";
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan semua soal pada gambar ini satu per satu secara detail.";
         pesanKirim.push({
           role: "user",
           content: [
-            // MENGGABUNGKAN INSTRUKSI PAKAR DAN SOAL AGAR AI TIDAK BISA MENGABAIKANNYA
             { type: "text", text: `${instruksiPakar}\n\nPerintah Tambahan: ${teksPrompt}` },
             { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
           ]
         });
       } else {
-        // MENGGABUNGKAN INSTRUKSI PAKAR UNTUK TEKS MURNI
         pesanKirim.push({ role: "user", content: `${instruksiPakar}\n\nSoal: ${pertanyaanClean}` });
       }
       
-      // Menggunakan struktur fetch biasa di bot kamu dengan parameter presisi pilihanmu
       const resNvidiaTugas = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", { 
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${NVIDIA_API_KEY}` // Pastikan variabel NVIDIA_API_KEY sudah diisi di Vercel
+          'Authorization': `Bearer ${NVIDIA_API_KEY}` 
         }, 
         body: JSON.stringify({ 
           model: modelTugas, 
           messages: pesanKirim,
-          max_tokens: 4100,         // Sesuai setelan lega pilihanmu
-          temperature: 0.60,       // Sesuai parameter kodemu
-          top_p: 0.95,             // Sesuai parameter kodemu
-          frequency_penalty: 0.00,
-          presence_penalty: 0.00,
-          stream: false            // Wajib false agar respon teks utuh bisa ditangkap oleh bot
+          max_tokens: 4100,      
+          temperature: 0.60,      
+          top_p: 0.95,            
+          stream: false           
         })
       });
       
@@ -523,15 +511,15 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
-        let htmlBersih = hasilTugas;
-        htmlBersih = htmlBersih.replace(/<think>[\s\S]*?<\/think>/gi, '');
-        htmlBersih = htmlBersih.replace(/```html/gi, '').replace(/```/g, '');
+        let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
-        const ekstrakHtml = htmlBersih.match(/<h3[\s\S]*/i);
-        if (ekstrakHtml) {
-            htmlBersih = ekstrakHtml[0];
-        }
+        // Mencegah kode dari AI merusak struktur HTML file kita
+        const amanUntukHtml = markdownBersih
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
         
+        // 🔥 DESAIN HTML BARU: DITAMBAH MARKED.JS (PENERJEMAH MARKDOWN OTOMATIS)
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -540,43 +528,57 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Kunci Jawaban & Pembahasan</title>
             
+            <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+            
             <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
             <script>
               window.MathJax = {
-                tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] }
+                tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] },
+                startup: {
+                  pageReady: () => {
+                    // 1. Ambil teks asli dari AI
+                    const rawMarkdown = document.getElementById('raw-markdown').value;
+                    // 2. Ubah Markdown menjadi desain HTML lalu tampilkan
+                    document.getElementById('content').innerHTML = marked.parse(rawMarkdown);
+                    // 3. Render rumus matematika agar rapi
+                    return MathJax.typesetPromise(document.getElementById('content'));
+                  }
+                }
               };
             </script>
+            <script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
 
             <style>
-                /* KEMBALI 100% KAKU KE TEMPLATE AWAL FILE 24 (PUTIH BERSIH & AMAN DI HP) */
-                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
-                h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
-                ul { padding-left: 20px; }
-                li { margin-bottom: 5px; }
+                /* TEMPLATE FILE 24 (PUTIH BERSIH & MEWAH) */
+                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.5; padding: 15px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
+                h1, h2, h3, h4 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
+                ul, ol { padding-left: 20px; }
+                li { margin-bottom: 8px; }
                 p { margin-bottom: 12px; }
                 hr { border: 0; border-top: 1px solid #ddd; margin: 30px 0; }
-                b { color: #000; }
+                b, strong { color: #000; }
                 .MathJax { overflow-x: auto; overflow-y: hidden; }
+                
+                /* Tambahan style jika AI memunculkan tabel */
+                table { border-collapse: collapse; width: 100%; margin-bottom: 15px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
             </style>
         </head>
         <body>
             <h2 style="text-align: center; color: #2c3e50; margin-bottom: 30px;">📄 Kunci Jawaban & Pembahasan</h2>
-            ${htmlBersih}
+            
+            <textarea id="raw-markdown" style="display: none;">${amanUntukHtml}</textarea>
+            
+            <div id="content"></div>
         </body>
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Nvidia Llama Vision`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis Llama Vision (Markdown Optimized)`);
       } else {
         const pesanError = nvidiaData.error?.message || JSON.stringify(nvidiaData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Nvidia:*\n\`${pesanError}\``);
       }
     } // Penutup dari else if (aiPilihan === "tugas")
-    
-  } catch (error) {
-    console.error('Webhook handler error:', error);
-  }
-
-  return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
-} // Penutup akhir dari export default async function handler(req)
+  
