@@ -14,7 +14,7 @@ const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 // =======================================================
 
-// 🔥 KEMBALIKAN FUNGSI SET REDIS
+// 🔥 GEMBOK REDIS
 async function setRedis(key, value) {
   await fetch(`${UPSTASH_REST_URL}/set/${key}`, {
     method: 'POST',
@@ -31,25 +31,18 @@ async function getRedis(key) {
   return data.result ? JSON.parse(data.result) : null;
 }
 
-// 🔥 FUNGSI BANTUAN
+// 🔥 FUNGSI BANTUAN INTERNET & CLOUDINARY
 async function cariDiInternet(query) {
   try {
     const response = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: TAVILY_API_KEY,
-        query: query,
-        max_results: 3,
-        search_depth: "basic"
-      })
+      body: JSON.stringify({ api_key: TAVILY_API_KEY, query: query, max_results: 3, search_depth: "basic" })
     });
     const data = await response.json();
     if (!data.results || data.results.length === 0) return "Tidak ditemukan informasi relevan di internet.";
     return data.results.map(res => `Sumber: ${res.title} (${res.url})\nInformasi: ${res.content}`).join("\n\n");
-  } catch (err) {
-    return "Gagal melakukan pencarian internet karena gangguan teknis.";
-  }
+  } catch (err) { return "Gagal melakukan pencarian internet karena gangguan teknis."; }
 }
 
 async function uploadCloudinaryKustom(imageBuffer, jenisPerbaikan) {
@@ -60,67 +53,43 @@ async function uploadCloudinaryKustom(imageBuffer, jenisPerbaikan) {
     formData.append('timestamp', Math.floor(Date.now() / 1000).toString());
     formData.append('upload_preset', 'ml_default');
 
-    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
-      method: 'POST', body: formData
-    });
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: formData });
     const data = await res.json();
     if (!res.ok) return null;
 
     const urlAsli = data.secure_url;
     let efek = "q_auto,f_auto"; 
-
-    if (jenisPerbaikan.includes("semua kontras")) {
-      efek += ",e_improve,e_sharpen:40,e_auto_contrast"; 
-    } else if (jenisPerbaikan.includes("semua")) {
-      efek += ",e_improve,e_sharpen:40,e_auto_contrast,e_auto_color"; 
-    }
-
-    if (jenisPerbaikan.includes("bersih kontras")) {
-      efek += ",e_auto_contrast"; 
-    } else if (jenisPerbaikan.includes("bersih")) {
-      efek += ",e_auto_contrast,e_auto_color"; 
-    }
-
+    if (jenisPerbaikan.includes("semua kontras")) efek += ",e_improve,e_sharpen:40,e_auto_contrast"; 
+    else if (jenisPerbaikan.includes("semua")) efek += ",e_improve,e_sharpen:40,e_auto_contrast,e_auto_color"; 
+    if (jenisPerbaikan.includes("bersih kontras")) efek += ",e_auto_contrast"; 
+    else if (jenisPerbaikan.includes("bersih")) efek += ",e_auto_contrast,e_auto_color"; 
     if (jenisPerbaikan.includes("terang")) efek += ",e_improve";
     if (jenisPerbaikan.includes("tajam")) efek += ",e_sharpen:60";
     if (jenisPerbaikan.includes("warna")) efek += ",e_auto_color";
 
     return urlAsli.replace("/upload/", `/upload/${efek}/`);
-  } catch (err) {
-    console.error("Cloudinary Error:", err);
-    return null;
-  }
+  } catch (err) { return null; }
 }
 
+// 🔥 FUNGSI TRANSMISI TELEGRAM
 async function kirimPesanTelegram(chatId, teks) {
   let teksBersih = teks.replace(/<think>[\s\S]*?<\/think>\n*/g, '').trim();
   if (!teksBersih) teksBersih = teks;
 
   let resMarkdown = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: chatId, text: teksBersih, parse_mode: 'Markdown' }),
   });
   let dataMarkdown = await resMarkdown.json();
 
   if (!dataMarkdown.ok) {
-    let htmlText = teksBersih.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    htmlText = htmlText.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-    htmlText = htmlText.replace(/`([^`]+)`/g, '<code>$1</code>');
-    
+    let htmlText = teksBersih.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>').replace(/`([^`]+)`/g, '<code>$1</code>');
     let resHtml = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: htmlText, parse_mode: 'HTML' }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: htmlText, parse_mode: 'HTML' }),
     });
     let dataHtml = await resHtml.json();
-
     if (!dataHtml.ok) {
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: teksBersih }),
-      });
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: teksBersih }) });
     }
   }
 }
@@ -135,9 +104,7 @@ async function kirimFotoBinaryTelegram(chatId, imageBuffer, caption) {
 
 async function kirimFotoTelegramURL(chatId, urlFoto, caption) {
   await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, photo: urlFoto, caption: caption, parse_mode: 'HTML' }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: urlFoto, caption: caption, parse_mode: 'HTML' }),
   });
 }
 
@@ -146,12 +113,9 @@ async function kirimDokumenHtmlTelegram(chatId, kontenHtml, namaFile, caption) {
   formData.append('chat_id', chatId);
   formData.append('document', new Blob([kontenHtml], { type: 'text/html' }), namaFile);
   if (caption) formData.append('caption', caption);
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument`, { method: 'POST', body: formData });
+}
 
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument`, {
-    method: 'POST',
-    body: formData
-  });
-                                    }
 // ================= FUNGSI UTAMA BOT =================
 export default async function handler(request) {
   if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
@@ -181,7 +145,7 @@ export default async function handler(request) {
     let isImage = false;
 
     if (fotoMasuk) {
-      const indexFoto = fotoMasuk.length -1; 
+      const indexFoto = fotoMasuk.length - 1; 
       fileIdToDownload = fotoMasuk[indexFoto].file_id;
       isImage = true;
     } 
@@ -201,18 +165,18 @@ export default async function handler(request) {
                          `🌐 *@search [kueri]* -> Mode Perplexity (Browsing internet realtime)\n` +
                          `🧠 *@gemini [pesan/foto]* -> Analisis teks & gambar tingkat lanjut\n` +
                          `⚡ *@groq [pesan]* -> Jawaban super cepat via Llama 3.3\n` +
-                         `🔮 *@super [pesan]* -> Mode penalaran mendalam (DiffusionGemma)\n` +
+                         `🔮 *@super [pesan]* -> Mode Llama 4 Scout (Super Kilat via Groq)\n` +
                          `📸 *@nano [foto]* -> NVIDIA Vision khusus pembaca gambar\n` +
                          `🎨 *@gambar [prompt]* -> Cari foto berkualitas tinggi via Pexels\n` +
                          `✨ *@edit [foto]* -> Perbagus foto dengan AI Racikan Kustom\n` +
-                         `📝 *@analisatugas [soal/foto]* -> Asisten cerdas tugas sekolah & bedah matematika\n\n` +
-                         `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@analisatugas kerjakan\``;
+                         `📝 *@AnalisaTugas [soal/foto]* -> Asisten cerdas tugas sekolah & bedah matematika\n\n` +
+                         `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@AnalisaTugas kerjakan\``;
                          
       await kirimPesanTelegram(chatId, teksSambut);
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
-        // 🔥 AMBIL MEMORI SALURAN LAMA TERLEBIH DAHULU
+    // 🔥 AMBIL MEMORI SALURAN LAMA TERLEBIH DAHULU
     let aiPilihan = await getRedis(`sesi_${chatId}`);
 
     // 🔥 TIMPA DENGAN SALURAN BARU SECARA INSTAN JIKA USER MENGETIK PERINTAH BARU
@@ -244,7 +208,7 @@ export default async function handler(request) {
 
     // Peringatan jika belum pilih AI
     if (!aiPilihan) {
-      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@analisatugas\` (kirim foto)");
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@AnalisaTugas\` (kirim foto)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
@@ -261,8 +225,8 @@ export default async function handler(request) {
         }
       }
     }
-    
-    if (aiPilihan === "edit") {
+
+        if (aiPilihan === "edit") {
       if (!isImage || !imageBuffer) {
         await kirimPesanTelegram(chatId, "📸 *Sesi AI Perbaikan Foto Aktif!*\nKirimkan fotomu lalu tambahkan salah satu kata kunci ini di caption:\n\n👉 *terang*, *tajam*, *warna*, *bersih*, *bersih kontras*, *semua*, atau *semua kontras*\n\n_(Kosongkan caption selain tag @edit untuk auto-poles alami)_");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
@@ -270,7 +234,6 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "🪄 AI sedang mengolah fotomu dengan racikan kustom...");
       
       const linkHasil = await uploadCloudinaryKustom(imageBuffer, pesanLowercase);
-      
       if (linkHasil) {
         await kirimFotoTelegramURL(chatId, linkHasil, "✨ Hasil perbaikan foto kamu sudah siap!");
       } else {
@@ -313,8 +276,9 @@ export default async function handler(request) {
           await setRedis(`memori_gemini_${chatId}`, memoriMentah.slice(-6));
       }
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
-                                       }
-        else if (aiPilihan === "search") {
+    }
+
+    else if (aiPilihan === "search") {
       const kueriPencarian = pesanUser.replace(/@search|\/search/gi, '').trim();
       if (!kueriPencarian) {
         await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian. Contoh: \`@search berita sepak bola hari ini\`");
@@ -356,22 +320,21 @@ export default async function handler(request) {
 
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ DiffusionGemma sedang merangkai jawaban...");
+      await kirimPesanTelegram(chatId, "⏳ Llama Scout (via Groq) sedang merangkai jawaban kilat...");
       let riwayatSuper = await getRedis(`memori_super_${chatId}`) || [];
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
 
       try {
-        const resSuper = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        const resSuper = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: 'POST', 
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
           body: JSON.stringify({ 
-            model: "google/diffusiongemma-26b-a4b-it", 
+            model: "meta-llama/llama-4-scout-17b-16e-instruct", 
             messages: riwayatSuper.slice(-16),
-            max_tokens: 2048,
-            temperature: 1.00,
-            top_p: 0.95,
-            stream: false,
-            chat_template_kwargs: { "enable_thinking": true } 
+            temperature: 1.0,
+            max_tokens: 1024,
+            top_p: 1.0,
+            stream: false
           })
         });
         
@@ -380,12 +343,12 @@ export default async function handler(request) {
           let jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Kosong.";
           riwayatSuper.push({ role: "assistant", content: jawabanSuper });
           await setRedis(`memori_super_${chatId}`, riwayatSuper.slice(-16));
-          await kirimPesanTelegram(chatId, `[DiffusionGemma]:\n\n${jawabanSuper}`);
+          await kirimPesanTelegram(chatId, `[Llama 4 Scout ⚡ Groq]:\n\n${jawabanSuper}`);
         } else {
-          await kirimPesanTelegram(chatId, `⚠️ Error API:\n${JSON.stringify(dataSuper).substring(0, 100)}`);
+          await kirimPesanTelegram(chatId, `⚠️ Error API Groq:\n${JSON.stringify(dataSuper).substring(0, 100)}`);
         }
       } catch (err) {
-        await kirimPesanTelegram(chatId, "⚠️ Waktu habis. Vercel memotong proses karena server NVIDIA terlalu lambat.");
+        await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan saat menghubungi server Groq.");
       }
     }
 
@@ -409,7 +372,6 @@ export default async function handler(request) {
           
           const data = await res.json();
           const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
-          
           if (!jawaban.startsWith("⚠️")) {
             riwayatNano.push({ role: "user", content: `[Melihat Gambar]: ${pertanyaanClean}` });
             riwayatNano.push({ role: "assistant", content: jawaban });
@@ -433,7 +395,6 @@ export default async function handler(request) {
           
           const data = await res.json();
           const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
-          
           if (!jawaban.startsWith("⚠️")) {
             riwayatNano.push({ role: "assistant", content: jawaban });
             if (riwayatNano.length > 8) riwayatNano = riwayatNano.slice(-8);
@@ -450,7 +411,7 @@ export default async function handler(request) {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
       if (!promptGambar) return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       await kirimPesanTelegram(chatId, "⏳ Mencari foto...");
-      const resPexels = await (await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1`, { headers: { "Authorization": "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq" } })).json();
+      const resPexels = await (await fetch://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1, { headers: { "Authorization": "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq" } })).json();
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
@@ -466,7 +427,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas sekolahmu...");
       
       // 🔥 PROMPT PAKAR & KURIKULUM SMA
-      const instruksiPakar = `Bertindaklah sebagai pakar pendidikan dan guru sekolah yang berpengalaman. Jawab disesuaikan dengan kurikulum SMA. WAJIB bungkus semua rumus dan angka matematika dengan simbol $...$ atau $$...$$.`;
+      const instruksiPakar = `Bertindaklah sebagai pakar pendidikan dan guru sekolah yang berpengalaman. Jawab disesuaikan dengan kurikulum SMA. Kerjakan soal yang diberikan selangkah demi selangkah agar mudah dipahami oleh siswa. WAJIB bungkus semua rumus dan angka matematika dengan simbol $...$ atau $$...$$.`;
       
       const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
@@ -512,7 +473,7 @@ export default async function handler(request) {
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
+            .replace(/>/g, "&gt bridge;");
         
         const desainHtmlUtuh = `
         <!DOCTYPE html>
@@ -566,5 +527,13 @@ export default async function handler(request) {
         const pesanError = nvidiaData.error?.message || JSON.stringify(nvidiaData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Nvidia:*\n\`${pesanError}\``);
       }
+    }
+
+  // 🔥 PENUTUP CATCH UTAMA JAVASCRIPT
+  } catch (error) {
+    console.error('Webhook handler error:', error);
   }
-    
+  
+  // 🔥 RESPON AKHIR KE SERVER VERCEL
+  return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
+}
