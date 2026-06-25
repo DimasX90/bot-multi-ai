@@ -532,7 +532,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [8] MODE ANALISA TUGAS SEKOLAH - ANTI-LOOP & FIX RUMUS INTEGRAL PROTECTED
+    // [8] MODE ANALISA TUGAS SEKOLAH - JALUR ALIH KE GROQ REASONING VISION
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
@@ -541,14 +541,15 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         return;
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas sekolahmu...");
+      await kirimPesanTelegram(chatId, "⏳ Groq Vision sedang melakukan Deep Reasoning pada soalmu...");
       
-      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains yang sangat akurat. Tugasmu:
-1. Jawab disesuaikan dengan kurikulum SMA.
-2. Tuliskan jawaban akhir sekali saja secara ringkas di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
+      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains SMA yang sangat akurat. Tugasmu:
+1. Selesaikan soal pada gambar secara terstruktur sesuai tingkat kurikulum SMA.
+2. Jika ada materi transformasi geometri (refleksi, rotasi, translasi, dilatasi), kamu WAJIB menuliskan rumus koordinat bakunya terlebih dahulu (misal rumus refleksi garis $y=k$ adalah $y' = 2k - y$) sebelum melakukan substitusi angka.
+3. Berikan pembahasan runut dan langsung ke inti rumus/perhitungan tanpa membuat kalimat penjelasan yang rancu.
+4. Tuliskan jawaban akhir sekali saja secara ringkas di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
 Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan $$...$$.`;
       
-      const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
 
       if (base64Image) {
@@ -564,42 +565,44 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan
         pesanKirim.push({ role: "user", content: `${instruksiPakar}\n\nSoal: ${pertanyaanClean}` });
       }
       
-      const resNvidiaTugas = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", { 
+      // Mengirimkan data gambar langsung ke API Groq menggunakan model Vision andalannya
+      const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${NVIDIA_API_KEY}` 
+          'Authorization': `Bearer ${GROQ_API_KEY}` 
         }, 
         body: JSON.stringify({ 
-          model: modelTugas, 
+          model: "llama-3.2-11b-vision-preview", 
           messages: pesanKirim,
-          max_tokens: 2500,      
-          temperature: 0.25,     // 🔥 DINAIKKAN SEDIKIT AGAR AI MEMILIKI LOGIKA MENGHINDARI LOOPING BERULANG
+          max_tokens: 3200,      
+          temperature: 0.25,     
           top_p: 0.95,            
           stream: false           
         })
       });
       
-      const nvidiaData = await resNvidiaTugas.json();
-      const hasilTugas = nvidiaData.choices?.[0]?.message?.content;
+      const groqData = await resGroqTugas.json();
+      const hasilTugas = groqData.choices?.[0]?.message?.content;
       
       if (hasilTugas) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Lengkap.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
+        // Memotong tag pikiran rahasia <think> agar tidak ikut tercetak di kertas putih pembahasan
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
+            .replace(/>/g, "&gt bridge;".replace(" bridge;", ";")); // Mengamankan karakter HTML tags
 
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
             <title>Kunci Jawaban & Pembahasan SMA</title>
             
             <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -612,7 +615,6 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan
                     let txt = document.getElementById('raw-markdown').value;
                     let mathBlocks = [];
                     
-                    // 🔒 AMANKAN DISPLAY MATH ($$) DARI GANGGUAN MARKED
                     let partsDD = txt.split("$$");
                     for (let i = 1; i < partsDD.length; i += 2) {
                       mathBlocks.push("$$" + partsDD[i] + "$$");
@@ -620,7 +622,6 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan
                     }
                     txt = partsDD.join("");
                     
-                    // 🔒 AMANKAN INLINE MATH ($) TERMASUK SIMBOL INTEGRAL UNDERSCORE
                     let partsD = txt.split("$");
                     for (let i = 1; i < partsD.length; i += 2) {
                       mathBlocks.push("$" + partsD[i] + "$");
@@ -628,10 +629,8 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan
                     }
                     txt = partsD.join("");
                     
-                    // Proses teks biasa dengan marked tanpa merusak matematika
                     let parsedHtml = marked.parse(txt);
                     
-                    // 🔓 KEMBALIKAN SEMUA RUMUS MATEMATIKA YANG UTUH KE TEMPATNYA
                     for (let i = 0; i < mathBlocks.length; i++) {
                       parsedHtml = parsedHtml.replace("%%DISPLAYMATH_" + i + "%%", mathBlocks[i]);
                       parsedHtml = parsedHtml.replace("%%INLINEMATH_" + i + "%%", mathBlocks[i]);
@@ -646,9 +645,17 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan
             <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
             <style>
-                body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 25px; color: #222; max-width: 850px; margin: 0 auto; font-size: 16px; background-color: #f9f9f9; }
-                .container-box { background: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-                h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 12px; margin-bottom: 25px; }
+                body { 
+                    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                    line-height: 1.6; 
+                    padding: 40px 25px; 
+                    color: #222; 
+                    max-width: 850px; 
+                    margin: 0 auto; 
+                    font-size: 16px; 
+                    background-color: #ffffff; 
+                }
+                h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 12px; margin-bottom: 30px; text-align: center; }
                 h3 { color: #34495e; margin-top: 25px; border-left: 4px solid #3498db; padding-left: 10px; }
                 ul, ol { padding-left: 22px; }
                 li { margin-bottom: 6px; }
@@ -656,26 +663,29 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan
                 hr { border: 0; border-top: 1px solid #eee; margin: 25px 0; }
                 b { color: #111; }
                 .MathJax { overflow-x: auto; overflow-y: hidden; font-size: 105%; }
+
+                @media (max-width: 600px) {
+                    body { padding: 20px 14px; }
+                    h2 { font-size: 22px; margin-bottom: 20px; }
+                    p, li { font-size: 15px; }
+                    .MathJax { font-size: 98%; }
+                }
             </style>
         </head>
         <body>
-            <div class="container-box">
-                <h2 style="text-align: center;">📄 Kunci Jawaban & Pembahasan Lengkap</h2>
-                <textarea id="raw-markdown" style="display: none;">${amanUntukHtml}</textarea>
-                <div id="content"></div>
-            </div>
+            
+            <h2>📄 Kunci Jawaban & Pembahasan Lengkap</h2>
+            <textarea id="raw-markdown" style="display: none;">${amanUntukHtml}</textarea>
+            <div id="content"></div>
+            
         </body>
         </html>
         `;
 
         await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil pembahasan matematika kurikulum SMA`);
       } else {
-        const pesanError = nvidiaData.error?.message || JSON.stringify(nvidiaData);
-        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Nvidia:*\n\`${pesanError}\``);
+        const pesanError = groqData.error?.message || JSON.stringify(groqData);
+        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
       }
     }
-
-  } catch (error) {
-    console.error('Error in background execution:', error);
-  }
-}
+    
