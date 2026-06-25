@@ -205,7 +205,7 @@ export default async function handler(request) {
                          `📸 *@nano [foto]* -> NVIDIA Vision khusus pembaca gambar\n` +
                          `🎨 *@gambar [prompt]* -> Cari foto berkualitas tinggi via Pexels\n` +
                          `✨ *@edit [foto]* -> Perbagus foto dengan AI Racikan Kustom\n` +
-                         `📝 *@tugas [soal/foto]* -> Asisten cerdas tugas sekolah & bedah matematika\n\n` +
+                         `📝 *@analisatugas [soal/foto]* -> Asisten cerdas tugas sekolah & bedah matematika\n\n` +
                          `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@tugas kerjakan\``;
                          
       await kirimPesanTelegram(chatId, teksSambut);
@@ -226,8 +226,8 @@ export default async function handler(request) {
       await setRedis(`sesi_${chatId}`, "gambar");
     } else if (pesanLowercase.includes("@edit")) {
       await setRedis(`sesi_${chatId}`, "edit");
-    } else if (pesanLowercase.includes("@tugas")) {     
-      await setRedis(`sesi_${chatId}`, "tugas");
+    } else if (pesanLowercase.includes("@analisatugas")) {     
+      await setRedis(`sesi_${chatId}`, "analisatugas");
     }
 
     let aiPilihan = await getRedis(`sesi_${chatId}`);
@@ -245,7 +245,7 @@ export default async function handler(request) {
       if (resFile.ok) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
         imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
-        if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "tugas") {
+        if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "analisatugas") {
           base64Image = Buffer.from(imageBuffer).toString('base64');
         }
       }
@@ -443,19 +443,19 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH - PROMPT SIMPLE + HTML AWAL + PENYESUAIAN AI (MARKED.JS)
-    else if (aiPilihan === "tugas") {
-      const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
+        // [G] MODE ANALISA TUGAS SEKOLAH - PROMPT PAKAR + HTML AWAL + PENYESUAIAN AI (MARKED.JS)
+    else if (aiPilihan === "analisatugas") {
+      const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
       if (!pertanyaanClean && !base64Image) {
-        await kirimPesanTelegram(chatId, "📝 *Saluran Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
+        await kirimPesanTelegram(chatId, "📝 *Saluran Analisa Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas matematika/sains sekolahmu...");
+      await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas sekolahmu...");
       
-      // 🔥 PROMPT SUPER SIMPEL (Sesuai Permintaanmu)
-      const instruksiPakar = `Bertindaklah sebagai guru matematika SMA. Kerjakan soal yang diberikan dan sesuaikan dengan kurikulum SMA. Berikan langkah-langkah penyelesaiannya. WAJIB bungkus semua rumus dan angka dengan simbol $...$ atau $$...$$.`;
+      // 🔥 PROMPT PAKAR & KURIKULUM SMA
+      const instruksiPakar = `Bertindaklah sebagai pakar pendidikan dan guru sekolah yang berpengalaman. Jawab disesuaikan dengan kurikulum SMA. Kerjakan soal yang diberikan selangkah demi selangkah agar mudah dipahami oleh siswa. WAJIB bungkus semua rumus dan angka matematika dengan simbol $...$ atau $$...$$.`;
       
       const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
@@ -555,14 +555,5 @@ export default async function handler(request) {
         const pesanError = nvidiaData.error?.message || JSON.stringify(nvidiaData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Nvidia:*\n\`${pesanError}\``);
       }
-    }
-
-  // 🔥 PENUTUP CATCH YANG HILANG SEBELUMNYA
-  } catch (error) {
-    console.error('Webhook handler error:', error);
   }
-  
-  // 🔥 KODE RESPON AKHIR AGAR SERVER VERCEL TIDAK MENGGANTUNG
-  return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
-        }
-                                  
+    
