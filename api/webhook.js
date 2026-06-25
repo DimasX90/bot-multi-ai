@@ -233,7 +233,7 @@ export default async function handler(request) {
     let aiPilihan = await getRedis(`sesi_${chatId}`);
 
     if (!aiPilihan) {
-      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@tugas\` (kirim foto)");
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@analisatugas\` (kirim foto)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
