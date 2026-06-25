@@ -543,10 +543,9 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       
       await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas sekolahmu...");
       
-      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains SMA yang sangat akurat. Tugasmu:
-1. Selesaikan soal pada gambar secara terstruktur sesuai tingkat kurikulum SMA.
-2. Berikan pembahasan runut dan langsung ke inti rumus/perhitungan.
-3. Tuliskan jawaban akhir sekali saja secara ringkas di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
+      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains yang sangat akurat. Tugasmu:
+1. Jawab disesuaikan dengan kurikulum SMA.
+2. Tuliskan jawaban akhir sekali saja secara ringkas di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
 Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan $$...$$.`;
       
       const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
