@@ -170,11 +170,19 @@ export default async function handler(request) {
   try {
     const data = await request.json();
     
+    // 🔥 UBAH LOGIKA SPAM-NYA DI SINI (Ganti bagian hitCount dengan ini)
     const updateId = data.update_id;
     if (updateId) {
-      const hitCount = await incrRedis(`spam_${updateId}`);
-      if (hitCount > 3) return new Response(JSON.stringify({ status: 'terblokir' }), { status: 200 });
+      // Cek apakah ID pesan ini sudah pernah masuk sebelumnya
+      const cekPesanGanda = await getRedis(`pesan_${updateId}`);
+      if (cekPesanGanda) {
+        // Jika sudah ada, langsung suruh Vercel diam dan abaikan pesan ini
+        return new Response(JSON.stringify({ status: 'ignored_duplicate' }), { status: 200 });
+      }
+      // Jika belum ada, catat ID pesan ini ke Redis agar tidak dikerjakan dua kali
+      await setRedis(`pesan_${updateId}`, "sedang diproses");
     }
+    // 🔥 BATAS PERUBAHAN. KODE DI BAWAH INI BIARKAN TETAP SAMA
 
     const messageData = data.message || {};
     const chatId = messageData.chat?.id;
@@ -200,7 +208,7 @@ export default async function handler(request) {
     if (!chatId || (pesanUser === "" && !isImage)) {
       return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
     }
-
+    
     if (pesanLowercase === "/start") {
       await setRedis(`sesi_${chatId}`, ""); 
       const teksSambut = `✨ *Selamat Datang di Multiple AI Response Bot!* ✨\n` +
