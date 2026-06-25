@@ -450,17 +450,17 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-        // [G] MODE TUGAS SEKOLAH - INTEGRASI LLAMA 4 MAVERICK VIA ENDPOINT NVIDIA AI (PARAMETER PRESISI PYTHON)
+    // [G] MODE TUGAS SEKOLAH - MURNI LLAMA VISION 11B VIA ENDPOINT NVIDIA AI CATALOG
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
       // 🔥 KUNCI PINDAH SALURAN
       if (!pertanyaanClean && !base64Image) {
-        await kirimPesanTelegram(chatId, "📝 *Saluran Tugas Aktif!*\nSilakan ketik tugas/soal sekolahmu ke sini.");
+        await kirimPesanTelegram(chatId, "📝 *Saluran Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Llama Maverick AI sedang menganalisis tugas matematika/sains sekolahmu...");
+      await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas matematika/sains sekolahmu...");
       
       // 🔥 PROMPT STRUKTUR GURU MATEMATIKA RACIKAN KAMU
       const instruksiPakar = `Bertindaklah sebagai guru matematika SMA yang berpengalaman. Untuk setiap soal yang saya berikan:
@@ -472,21 +472,27 @@ export default async function handler(request) {
 
 DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan tag HTML (<h3>, <ul>, <li>, <p>, <br>).`;
       
-      // Sesuai dengan dokumentasi resmi Nvidia yang kamu kirim
-      const modelTugas = "meta/llama-4-maverick-17b-128e-instruct"; 
+      // Murni menggunakan satu model vision untuk semua skenario (Foto & Teks)
+      const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
 
       pesanKirim.push({ role: "system", content: instruksiPakar });
 
-      // Karena model ini text-only, kita kirim perintah teks saja agar tidak memicu error Bad Request
+      // 🔥 STRUKTUR PAYLOAD SERAGAM (Llama Vision wajib menerima struktur objek khusus ini jika ada gambar)
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan dan jabarkan soal matematika/sains sesuai instruksi sistem.";
-        pesanKirim.push({ role: "user", content: teksPrompt });
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan seluruh soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
+        pesanKirim.push({
+          role: "user",
+          content: [
+            { type: "text", text: teksPrompt },
+            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
+          ]
+        });
       } else {
         pesanKirim.push({ role: "user", content: pertanyaanClean });
       }
       
-      // Menggunakan struktur fetch biasa di bot kamu untuk menembak endpoint Nvidia AI dengan parameter presisi Python
+      // Menggunakan struktur fetch biasa di bot kamu dengan parameter presisi pilihanmu
       const resNvidiaTugas = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", { 
         method: 'POST', 
         headers: { 
@@ -496,11 +502,11 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
         body: JSON.stringify({ 
           model: modelTugas, 
           messages: pesanKirim,
-          max_tokens: 4100,         // Diperbarui: Sesuai dengan kode Python kamu
-          temperature: 1.00,       // Diperbarui: Sesuai dengan kode Python kamu
-          top_p: 1.00,             // Diperbarui: Sesuai dengan kode Python kamu
-          frequency_penalty: 0.00, // Diperbarui: Sesuai dengan kode Python kamu
-          presence_penalty: 0.00,  // Diperbarui: Sesuai dengan kode Python kamu
+          max_tokens: 4100,         // Sesuai setelan lega pilihanmu
+          temperature: 0.60,       // Sesuai parameter kodemu
+          top_p: 0.95,             // Sesuai parameter kodemu
+          frequency_penalty: 0.00,
+          presence_penalty: 0.00,
           stream: false            // Wajib false agar respon teks utuh bisa ditangkap oleh bot
         })
       });
@@ -510,7 +516,7 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
       
       if (hasilTugas) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
-        const namaFileHasil = base64Image ? "Analisis_Soal_Teks.html" : "Tugas_Sekolah_Siap_Cetak.html";
+        const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
         let htmlBersih = hasilTugas;
         htmlBersih = htmlBersih.replace(/<think>[\s\S]*?<\/think>/gi, '');
@@ -556,7 +562,7 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama Maverick AI`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Nvidia Llama Vision`);
       } else {
         const pesanError = nvidiaData.error?.message || JSON.stringify(nvidiaData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Nvidia:*\n\`${pesanError}\``);
