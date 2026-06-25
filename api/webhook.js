@@ -94,14 +94,6 @@ async function kirimPesanTelegram(chatId, teks) {
   }
 }
 
-async function kirimFotoBinaryTelegram(chatId, imageBuffer, caption) {
-  const formData = new FormData();
-  formData.append('chat_id', chatId);
-  formData.append('photo', new Blob([imageBuffer], { type: 'image/jpeg' }), 'edited.jpg');
-  formData.append('caption', caption);
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, { method: 'POST', body: formData });
-}
-
 async function kirimFotoTelegramURL(chatId, urlFoto, caption) {
   await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: urlFoto, caption: caption, parse_mode: 'HTML' }),
@@ -116,8 +108,8 @@ async function kirimDokumenHtmlTelegram(chatId, kontenHtml, namaFile, caption) {
   await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendDocument`, { method: 'POST', body: formData });
 }
 
-// ================= FUNGSI UTAMA BOT =================
-export default async function handler(request) {
+// ================= MAIN HANDLER DENGAN BACKGROUND WORKER =================
+export default async function handler(request, context) {
   if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
   try {
@@ -140,24 +132,12 @@ export default async function handler(request) {
     
     const fotoMasuk = messageData.photo;
     const dokumenMasuk = messageData.document;
-    
-    let fileIdToDownload = null;
-    let isImage = false;
 
-    if (fotoMasuk) {
-      const indexFoto = fotoMasuk.length - 1; 
-      fileIdToDownload = fotoMasuk[indexFoto].file_id;
-      isImage = true;
-    } 
-    else if (dokumenMasuk && dokumenMasuk.mime_type && dokumenMasuk.mime_type.startsWith('image/')) {
-      fileIdToDownload = dokumenMasuk.file_id;
-      isImage = true;
-    }
-
-    if (!chatId || (pesanUser === "" && !isImage)) {
+    if (!chatId || (pesanUser === "" && !fotoMasuk && !dokumenMasuk)) {
       return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
     }
     
+    // JIKA MENGETIK /START, BALAS LANGSUNG INSTAN
     if (pesanLowercase === "/start") {
       await setRedis(`sesi_${chatId}`, ""); 
       const teksSambut = `✨ *Selamat Datang di Multiple AI Response Bot!* ✨\n` +
@@ -176,60 +156,71 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
-    // 🔥 AMBIL MEMORI SALURAN LAMA TERLEBIH DAHULU
+    // 🔥 JALUR CEPAT DETEKSI SALURAN (ANTI-NYANGKUT)
     let aiPilihan = await getRedis(`sesi_${chatId}`);
+    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) { aiPilihan = "search"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@gemini") || (fotoMasuk && pesanUser === "" && aiPilihan !== "edit")) { aiPilihan = "gemini"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) { aiPilihan = "groq"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@super")) { aiPilihan = "super"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@nano")) { aiPilihan = "nano"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@gambar")) { aiPilihan = "gambar"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@edit")) { aiPilihan = "edit"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@analisatugas")) { aiPilihan = "analisatugas"; await setRedis(`sesi_${chatId}`, aiPilihan); }
 
-    // 🔥 TIMPA DENGAN SALURAN BARU SECARA INSTAN JIKA USER MENGETIK PERINTAH BARU
-    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) {
-      aiPilihan = "search";
-      await setRedis(`sesi_${chatId}`, aiPilihan);
-    } else if (pesanLowercase.includes("@gemini") || (isImage && pesanUser === "" && aiPilihan !== "edit")) {
-      aiPilihan = "gemini";
-      await setRedis(`sesi_${chatId}`, aiPilihan);
-    } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
-      aiPilihan = "groq";
-      await setRedis(`sesi_${chatId}`, aiPilihan);
-    } else if (pesanLowercase.includes("@super")) {
-      aiPilihan = "super";
-      await setRedis(`sesi_${chatId}`, aiPilihan);
-    } else if (pesanLowercase.includes("@nano")) { 
-      aiPilihan = "nano";
-      await setRedis(`sesi_${chatId}`, aiPilihan);
-    } else if (pesanLowercase.includes("@gambar")) {
-      aiPilihan = "gambar";
-      await setRedis(`sesi_${chatId}`, aiPilihan);
-    } else if (pesanLowercase.includes("@edit")) {
-      aiPilihan = "edit";
-      await setRedis(`sesi_${chatId}`, aiPilihan);
-    } else if (pesanLowercase.includes("@analisatugas")) {     
-      aiPilihan = "analisatugas";
-      await setRedis(`sesi_${chatId}`, aiPilihan);
+    if (!aiPilihan) {
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, atau \`@AnalisaTugas\` (kirim foto)");
+      return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
-    // Peringatan jika belum pilih AI
-    if (!aiPilihan) {
-      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@AnalisaTugas\` (kirim foto)");
-      return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+    // 🔥 LEMPAR PROSES BERAT KE LATAR BELAKANG AGAR TIDAK TIMEOUT 25 DETIK!
+    context.waitUntil(prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase, fotoMasuk, dokumenMasuk));
+
+    // KIRIM RESPON AWAL INSTAN KE VERCEL (AKAN LOLOS DARI BATAS 25 DETIK)
+    return new Response(JSON.stringify({ status: 'queued_in_background' }), { status: 200 });
+
+  } catch (error) {
+    console.error('Main handler error:', error);
+    return new Response(JSON.stringify({ status: 'error' }), { status: 500 });
+  }
+}
+
+// ================= FUNGSI PROSES DI LATAR BELAKANG (BACKGROUND WORKER) =================
+async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase, fotoMasuk, dokumenMasuk) {
+  try {
+    let fileIdToDownload = null;
+    let isImage = false;
+
+    if (fotoMasuk) {
+      const indexFoto = fotoMasuk.length - 1; 
+      fileIdToDownload = fotoMasuk[indexFoto].file_id;
+      isImage = true;
+    } 
+    else if (dokumenMasuk && dokumenMasuk.mime_type && dokumenMasuk.mime_type.startsWith('image/')) {
+      fileIdToDownload = dokumenMasuk.file_id;
+      isImage = true;
     }
 
     let imageBuffer = null;
     let base64Image = null;
     
+    // Proses download gambar dilakukan di latar belakang tanpa membebani server utama
     if (isImage && fileIdToDownload) {
       const resFile = await (await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${fileIdToDownload}`)).json();
       if (resFile.ok) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
-        imageBuffer = await (await fetch(fileUrl)).arrayBuffer();
+        const resStream = await fetch(fileUrl);
+        imageBuffer = await resStream.arrayBuffer();
         if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "analisatugas") {
           base64Image = Buffer.from(imageBuffer).toString('base64');
         }
       }
     }
-
-        if (aiPilihan === "edit") {
+    
+    // [1] MODE EDIT GAMBAR VIA CLOUDINARY
+    if (aiPilihan === "edit") {
       if (!isImage || !imageBuffer) {
         await kirimPesanTelegram(chatId, "📸 *Sesi AI Perbaikan Foto Aktif!*\nKirimkan fotomu lalu tambahkan salah satu kata kunci ini di caption:\n\n👉 *terang*, *tajam*, *warna*, *bersih*, *bersih kontras*, *semua*, atau *semua kontras*\n\n_(Kosongkan caption selain tag @edit untuk auto-poles alami)_");
-        return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+        return;
       }
       await kirimPesanTelegram(chatId, "🪄 AI sedang mengolah fotomu dengan racikan kustom...");
       
@@ -241,6 +232,7 @@ export default async function handler(request) {
       }
     }
       
+    // [2] MODE GEMINI MULTIMODAL
     else if (aiPilihan === "gemini") {
       let pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis.";
       pertanyaanClean += " (Berikan jawaban yang singkat, padat, langsung ke inti langkah pengerjaan/rumusnya saja, hindari teks pembuka atau penjelasan teori yang terlalu panjang agar respons cepat).";
@@ -278,11 +270,12 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
     }
 
+    // [3] MODE PERPLEXITY (BROWSING + GROQ)
     else if (aiPilihan === "search") {
       const kueriPencarian = pesanUser.replace(/@search|\/search/gi, '').trim();
       if (!kueriPencarian) {
         await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian. Contoh: \`@search berita sepak bola hari ini\`");
-        return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+        return;
       }
 
       await kirimPesanTelegram(chatId, "🌐 Sedang berselancar di internet via Tavily...");
@@ -302,9 +295,9 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Groq]:\n\n" + jawabanFinal);
     }
       
+    // [4] MODE GROQ CONVERSATIONAL
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
-      if (isImage) return new Response(JSON.stringify({ status: 'redirected' }), { status: 200 });
       await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
       let riwayatChat = await getRedis(`memori_${chatId}`) || [];
       riwayatChat.push({ role: "user", content: pertanyaanClean });
@@ -318,6 +311,7 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
 
+    // [5] MODE SUPER KILAT VIA LLAMA 4 SCOUT (GROQ)
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ Llama Scout (via Groq) sedang merangkai jawaban kilat...");
@@ -352,6 +346,7 @@ export default async function handler(request) {
       }
     }
 
+        // [6] MODE NVIDIA VISION
     else if (aiPilihan === "nano") {
       const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
       await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang menganalisis pesan...");
@@ -407,21 +402,22 @@ export default async function handler(request) {
       }
     }
       
+    // [7] MODE PENCARIAN GAMBAR PEXELS (SUDAH DIPERBAIKI)
     else if (aiPilihan === "gambar") {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
-      if (!promptGambar) return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+      if (!promptGambar) return;
       await kirimPesanTelegram(chatId, "⏳ Mencari foto...");
       const resPexels = await (await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1`, { headers: { "Authorization": "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq" } })).json();
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-        // [G] MODE ANALISA TUGAS SEKOLAH - PROMPT PAKAR + HTML AWAL + PENYESUAIAN AI (MARKED.JS)
+    // [8] MODE ANALISA TUGAS SEKOLAH - PROMPT PAKAR + HTML AWAL + PENYESUAIAN AI (MARKED.JS - SUDAH DIPERBAIKI)
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
       if (!pertanyaanClean && !base64Image) {
         await kirimPesanTelegram(chatId, "📝 *Saluran Analisa Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
-        return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+        return;
       }
       
       await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas sekolahmu...");
@@ -473,7 +469,7 @@ export default async function handler(request) {
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt bridge;");
+            .replace(/>/g, "&gt;");
         
         const desainHtmlUtuh = `
         <!DOCTYPE html>
@@ -529,11 +525,9 @@ export default async function handler(request) {
       }
     }
 
-  // 🔥 PENUTUP CATCH UTAMA JAVASCRIPT
+  // 🔥 KURUNG PENUTUP UNTUK BLOK TRY & FUNGSI LATAR BELAKANG
   } catch (error) {
-    console.error('Webhook handler error:', error);
+    console.error('Error in background execution:', error);
   }
-  
-  // 🔥 RESPON AKHIR KE SERVER VERCEL
-  return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
 }
+        
