@@ -450,90 +450,65 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-                // [G] MODE TUGAS SEKOLAH - ALTERNATIF FIX VIA LLAMA 11B VISION & KUNCI STABIL FILE 24
+    // [G] MODE TUGAS SEKOLAH - INTEGRASI LLAMA 4 MAVERICK VIA ENDPOINT NVIDIA AI
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
       // 🔥 KUNCI PINDAH SALURAN
       if (!pertanyaanClean && !base64Image) {
-        await kirimPesanTelegram(chatId, "📝 *Saluran Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO soalmu ke sini.");
+        await kirimPesanTelegram(chatId, "📝 *Saluran Tugas Aktif!*\nSilakan ketik tugas/soal sekolahmu ke sini.");
         return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Llama Vision AI sedang menganalisis tugas matematika/sains sekolahmu...");
+      await kirimPesanTelegram(chatId, "⏳ Llama Maverick AI sedang menganalisis tugas matematika/sains sekolahmu...");
       
-      // 🔥 INSTRUKSI SUPER PREMIUM v6
-      const instruksiPakar = `Kamu adalah guru matematika/sains formal sekolah. TUGASMU ADALAH MENYELESAIKAN SELURUH SOAL YANG TERLIHAT PADA GAMBAR SECARA BERURUTAN!
+      // 🔥 PROMPT STRUKTUR GURU MATEMATIKA RACIKAN KAMU
+      const instruksiPakar = `Bertindaklah sebagai guru matematika SMA yang berpengalaman. Untuk setiap soal yang saya berikan:
+1. Tuliskan rumus umum yang relevan sesuai kurikulum (Wajib menggunakan huruf/simbol tanpa angka soal).
+2. Jelaskan langkah penyelesaian secara detail (step-by-step) menjabarkan hitungan baris demi baris menggunakan tag <br> setiap turun baris.
+3. Tampilkan substitusi angka ke dalam rumus dengan jelas.
+4. Gunakan format matematika yang rapi menggunakan LaTeX $...$ atau $$...$$.
+5. Berikan kesimpulan akhir atau jawaban akhir yang tegas di bagian paling bawah.
 
-Untuk SETIAP SOAL, kamu WAJIB mematuhi kerangka HTML mutlak ini tanpa terkecuali:
-
-<h3>Soal [Nomor]</h3>
-<ul>
-<li><b>Diketahui:</b> [Singkat]</li>
-<li><b>Ditanya:</b> [Singkat]</li>
-</ul>
-<p><b>Rumus Umum Matriks (Wajib Tulis Huruf/Simbol):</b><br>
-[Jelaskan teori/rumus dasar menggunakan variabel huruf/simbol dengan LaTeX $...$ atau $$...$$. DI BAGIAN INI DILARANG KERAS MEMASUKKAN ANGKA DARI SOAL! Jika soal berupa fisika/sains, tulis rumus umum fisika teoritisnya di kotak ini.]</p>
-<p><b>Langkah Penyelesaian (Substitusi Angka):</b><br>
-[Tulis ulang rumusnya dan masukkan angka dari soal. Jabarkan hitungan baris demi baris menggunakan tag <br> setiap turun baris!]</p>
-<p><b>Jawaban Akhir:</b> [Kesimpulan]</p>
-<hr>
-
-ATURAN MUTLAK:
-1. JANGAN gunakan markdown seperti # atau **.
-2. WAJIB gunakan format pmatrix LaTeX ($ atau $$) untuk matriks.
-3. SIMBOL KALI: JANGAN PERNAH gunakan bintang (*). Wajib gunakan \\times atau \\cdot.
-4. Bagian 'Rumus Umum Matriks' HARUS BERISI HURUF/SIMBOL, bukan angka!
-5. ANTI LOMPAT LOGIKA DASAR: JABARKAN cara mendapatkan nilai awal/akar/pusat terlebih dahulu jika ada persamaan awal!`;
+DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan tag HTML (<h3>, <ul>, <li>, <p>, <br>).`;
       
-      let hasilTugas = "";
-      let detailErrorSistem = "";
+      // Sesuai dengan dokumentasi resmi Nvidia yang kamu kirim
+      const modelTugas = "meta/llama-4-maverick-17b-128e-instruct"; 
+      let pesanKirim = [];
 
-      try {
-        let pesanKirimGroq = [{ role: "system", content: instruksiPakar }];
-        
-        // Memasukkan gambar base64 dengan struktur Array Object yang valid untuk model Vision Groq
-        if (base64Image) {
-          const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan soal pada gambar ini sesuai format HTML yang diwajibkan sistem.";
-          pesanKirimGroq.push({
-            role: "user",
-            content: [
-              { type: "text", text: teksPrompt },
-              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
-            ]
-          });
-        } else {
-          pesanKirimGroq.push({ role: "user", content: pertanyaanClean });
-        }
+      pesanKirim.push({ role: "system", content: instruksiPakar });
 
-        // 🔥 MENGGUNAKAN LLAMA 11B VISION (KUOTA LUAS & BISA MELIHAT GAMBAR)
-        const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
-          body: JSON.stringify({
-            model: "llama-3.2-90b-vision-preview", 
-            messages: pesanKirimGroq,
-            max_completion_tokens: 4096,
-            temperature: 0.4,
-            top_p: 0.95
-          })
-        });
-
-        const groqData = await resGroq.json();
-        
-        if (groqData.error) {
-          detailErrorSistem = `Groq Error: ${groqData.error.message}`;
-        } else {
-          hasilTugas = groqData.choices?.[0]?.message?.content || "";
-        }
-      } catch (errGroq) {
-        detailErrorSistem = `Exception: ${errGroq.message}`;
+      // Karena model ini text-only, kita kirim perintah teks teks saja agar tidak memicu error Bad Request
+      if (base64Image) {
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan dan jabarkan soal matematika/sains sesuai instruksi sistem.";
+        pesanKirim.push({ role: "user", content: teksPrompt });
+      } else {
+        pesanKirim.push({ role: "user", content: pertanyaanClean });
       }
-
-      // PROSES PENCETAKAN HTML STANDARD FILE 24
-      if (hasilTugas && !detailErrorSistem) {
+      
+      // Menggunakan struktur fetch biasa di bot kamu untuk menembak endpoint Nvidia AI
+      const resNvidiaTugas = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", { 
+        method: 'POST', 
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${NVIDIA_API_KEY}` // Pastikan variabel NVIDIA_API_KEY sudah diisi di Vercel
+        }, 
+        body: JSON.stringify({ 
+          model: modelTugas, 
+          messages: pesanKirim,
+          max_tokens: 2048, // Ditambahkan agar jawaban penjabaran rumus tidak terpotong di tengah jalan
+          temperature: 1.00, // Mengikuti spesifikasi dokumentasi Nvidia kamu
+          top_p: 1.00,       // Mengikuti spesifikasi dokumentasi Nvidia kamu
+          stream: false      // Wajib false agar respon teks utuh bisa ditangkap oleh bot
+        })
+      });
+      
+      const nvidiaData = await resNvidiaTugas.json();
+      const hasilTugas = nvidiaData.choices?.[0]?.message?.content;
+      
+      if (hasilTugas) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
-        const namaFileHasil = base64Image ? "Analisis_Soal_Foto.html" : "Tugas_Sekolah_Siap_Cetak.html";
+        const namaFileHasil = base64Image ? "Analisis_Soal_Teks.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
         let htmlBersih = hasilTugas;
         htmlBersih = htmlBersih.replace(/<think>[\s\S]*?<\/think>/gi, '');
@@ -561,7 +536,7 @@ ATURAN MUTLAK:
             </script>
 
             <style>
-                /* 100% KEMBALI KAKU KE FORMAT AWAL FILE 24 (PUTIH BERSIH & AMAN DI HP) */
+                /* KEMBALI 100% KAKU KE TEMPLATE AWAL FILE 24 (PUTIH BERSIH & AMAN DI HP) */
                 body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.4; padding: 12px; color: #222; max-width: 800px; margin: 0 auto; font-size: 16px; }
                 h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-top: 30px; }
                 ul { padding-left: 20px; }
@@ -579,9 +554,10 @@ ATURAN MUTLAK:
         </html>
         `;
 
-        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama Vision AI`);
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil analisis dari Llama Maverick AI`);
       } else {
-        await kirimPesanTelegram(chatId, `❌ *Gagal memproses!*\n\nDetail kendala sistem: \`${detailErrorSistem}\``);
+        const pesanError = nvidiaData.error?.message || JSON.stringify(nvidiaData);
+        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Nvidia:*\n\`${pesanError}\``);
       }
     } // Penutup dari else if (aiPilihan === "tugas")
     
@@ -590,5 +566,5 @@ ATURAN MUTLAK:
   }
 
   return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
-} // Penutup akhir handler file
-          
+} // Penutup akhir dari export default async function handler(req)
+      
