@@ -1,9 +1,7 @@
-// 🔥 TAMBAHKAN BARIS INI DI PALING ATAS
+// 🔥 WAJIB ADA AGAR VERCEL MEMBERI WAKTU 60 DETIK PENUH
 export const maxDuration = 60;
 
-export const config = {
-  runtime: 'edge',
-};
+// (Blok "export const config { runtime: 'edge' }" SUDAH DIHAPUS DARI SINI)
 
 // ==================== CONFIGURATION ====================
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
@@ -17,8 +15,9 @@ const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 // =======================================================
 
+// 🔥 PERBAIKAN GEMBOK REDIS (Otomatis hilang dalam 10 menit agar database tidak penuh)
 async function setRedis(key, value) {
-  await fetch(`${UPSTASH_REST_URL}/set/${key}`, {
+  await fetch(`${UPSTASH_REST_URL}/set/${key}?EX=600`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${UPSTASH_REST_TOKEN}` },
     body: JSON.stringify(value),
@@ -33,14 +32,7 @@ async function getRedis(key) {
   return data.result ? JSON.parse(data.result) : null;
 }
 
-async function incrRedis(key) {
-  const res = await fetch(`${UPSTASH_REST_URL}/incr/${key}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${UPSTASH_REST_TOKEN}` },
-  });
-  const data = await res.json();
-  return data.result;
-}
+// (Fungsi incrRedis sudah dihapus secara permanen dari sini karena kita akan langsung memblokir spam di pintu depan)
 
 async function cariDiInternet(query) {
   try {
