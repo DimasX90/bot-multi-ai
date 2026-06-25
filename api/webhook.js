@@ -450,7 +450,7 @@ export default async function handler(request) {
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [G] MODE TUGAS SEKOLAH - INTEGRASI LLAMA 4 MAVERICK VIA ENDPOINT NVIDIA AI
+        // [G] MODE TUGAS SEKOLAH - INTEGRASI LLAMA 4 MAVERICK VIA ENDPOINT NVIDIA AI (PARAMETER PRESISI PYTHON)
     else if (aiPilihan === "tugas") {
       const pertanyaanClean = pesanUser.replace(/@tugas/gi, '').trim();
       
@@ -478,7 +478,7 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
 
       pesanKirim.push({ role: "system", content: instruksiPakar });
 
-      // Karena model ini text-only, kita kirim perintah teks teks saja agar tidak memicu error Bad Request
+      // Karena model ini text-only, kita kirim perintah teks saja agar tidak memicu error Bad Request
       if (base64Image) {
         const teksPrompt = pertanyaanClean ? pertanyaanClean : "Kerjakan dan jabarkan soal matematika/sains sesuai instruksi sistem.";
         pesanKirim.push({ role: "user", content: teksPrompt });
@@ -486,7 +486,7 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
         pesanKirim.push({ role: "user", content: pertanyaanClean });
       }
       
-      // Menggunakan struktur fetch biasa di bot kamu untuk menembak endpoint Nvidia AI
+      // Menggunakan struktur fetch biasa di bot kamu untuk menembak endpoint Nvidia AI dengan parameter presisi Python
       const resNvidiaTugas = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", { 
         method: 'POST', 
         headers: { 
@@ -496,10 +496,12 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
         body: JSON.stringify({ 
           model: modelTugas, 
           messages: pesanKirim,
-          max_tokens: 2048, // Ditambahkan agar jawaban penjabaran rumus tidak terpotong di tengah jalan
-          temperature: 1.00, // Mengikuti spesifikasi dokumentasi Nvidia kamu
-          top_p: 1.00,       // Mengikuti spesifikasi dokumentasi Nvidia kamu
-          stream: false      // Wajib false agar respon teks utuh bisa ditangkap oleh bot
+          max_tokens: 4100,         // Diperbarui: Sesuai dengan kode Python kamu
+          temperature: 1.00,       // Diperbarui: Sesuai dengan kode Python kamu
+          top_p: 1.00,             // Diperbarui: Sesuai dengan kode Python kamu
+          frequency_penalty: 0.00, // Diperbarui: Sesuai dengan kode Python kamu
+          presence_penalty: 0.00,  // Diperbarui: Sesuai dengan kode Python kamu
+          stream: false            // Wajib false agar respon teks utuh bisa ditangkap oleh bot
         })
       });
       
@@ -567,4 +569,3 @@ DILARANG menggunakan markdown seperti # atau **. Wajib cetak murni menggunakan t
 
   return new Response(JSON.stringify({ status: 'process_completed' }), { status: 200 });
 } // Penutup akhir dari export default async function handler(req)
-      
