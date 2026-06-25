@@ -212,26 +212,42 @@ export default async function handler(request) {
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
-    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) {
-      await setRedis(`sesi_${chatId}`, "search");
-    } else if (pesanLowercase.includes("@gemini") || (isImage && pesanUser === "" && (await getRedis(`sesi_${chatId}`)) !== "edit")) {
-      await setRedis(`sesi_${chatId}`, "gemini");
-    } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
-      await setRedis(`sesi_${chatId}`, "groq");
-    } else if (pesanLowercase.includes("@super")) {
-      await setRedis(`sesi_${chatId}`, "super");
-    } else if (pesanLowercase.includes("@nano")) { 
-      await setRedis(`sesi_${chatId}`, "nano");
-    } else if (pesanLowercase.includes("@gambar")) {
-      await setRedis(`sesi_${chatId}`, "gambar");
-    } else if (pesanLowercase.includes("@edit")) {
-      await setRedis(`sesi_${chatId}`, "edit");
-    } else if (pesanLowercase.includes("@analisatugas")) {     
-      await setRedis(`sesi_${chatId}`, "analisatugas");
-    }
-
+        // 🔥 AMBIL MEMORI SALURAN LAMA TERLEBIH DAHULU
     let aiPilihan = await getRedis(`sesi_${chatId}`);
 
+    // 🔥 TIMPA DENGAN SALURAN BARU SECARA INSTAN JIKA USER MENGETIK PERINTAH BARU
+    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) {
+      aiPilihan = "search";
+      await setRedis(`sesi_${chatId}`, aiPilihan);
+    } else if (pesanLowercase.includes("@gemini") || (isImage && pesanUser === "" && aiPilihan !== "edit")) {
+      aiPilihan = "gemini";
+      await setRedis(`sesi_${chatId}`, aiPilihan);
+    } else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) {
+      aiPilihan = "groq";
+      await setRedis(`sesi_${chatId}`, aiPilihan);
+    } else if (pesanLowercase.includes("@super")) {
+      aiPilihan = "super";
+      await setRedis(`sesi_${chatId}`, aiPilihan);
+    } else if (pesanLowercase.includes("@nano")) { 
+      aiPilihan = "nano";
+      await setRedis(`sesi_${chatId}`, aiPilihan);
+    } else if (pesanLowercase.includes("@gambar")) {
+      aiPilihan = "gambar";
+      await setRedis(`sesi_${chatId}`, aiPilihan);
+    } else if (pesanLowercase.includes("@edit")) {
+      aiPilihan = "edit";
+      await setRedis(`sesi_${chatId}`, aiPilihan);
+    } else if (pesanLowercase.includes("@analisatugas")) {     
+      aiPilihan = "analisatugas";
+      await setRedis(`sesi_${chatId}`, aiPilihan);
+    }
+
+    // Peringatan jika belum pilih AI
+    if (!aiPilihan) {
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@AnalisaTugas\` (kirim foto)");
+      return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+    }
+    
     if (!aiPilihan) {
       await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@analisatugas\` (kirim foto)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
