@@ -575,7 +575,7 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan
         body: JSON.stringify({ 
           model: "llama-3.2-11b-vision-preview", 
           messages: pesanKirim,
-          max_tokens: 3200,      
+          max_tokens: 4096,      
           temperature: 0.25,     
           top_p: 0.95,            
           stream: false           
