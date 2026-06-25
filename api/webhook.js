@@ -247,11 +247,6 @@ export default async function handler(request) {
       await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@AnalisaTugas\` (kirim foto)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
-    
-    if (!aiPilihan) {
-      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, \`@groq kode\`, atau \`@analisatugas\` (kirim foto)");
-      return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
-    }
 
     let imageBuffer = null;
     let base64Image = null;
