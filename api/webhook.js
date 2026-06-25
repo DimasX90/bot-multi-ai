@@ -532,7 +532,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [8] MODE ANALISA TUGAS SEKOLAH - JALUR ALIH KE GROQ REASONING VISION
+    // [8] MODE ANALISA TUGAS SEKOLAH - FIX PERKALIAN (x) & PANGKAT SQUARERED (²)
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
@@ -541,19 +541,21 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         return;
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Groq Vision sedang melakukan Deep Reasoning pada soalmu...");
+      await kirimPesanTelegram(chatId, "⏳ AI sedang melakukan Deep Reasoning berbasis Rumus Baku Kurikulum Nasional...");
       
-      const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA yang sangat disiplin dan akurat. Tugasmu:
+      // 🔥 PROMPT DIPERKETAT: PERINTAHKAN PERKALIAN 'x' DAN LARANG TANDA BINTANG (*)
+      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains SMA Senior yang sangat disiplin dan akurat. Tugasmu:
 1. Selesaikan soal pada gambar secara ilmiah, logis, dan runut sesuai dengan standar Kurikulum Nasional SMA.
-2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan (substitusi) angka koordinat atau variabel dari soal. Aturan ini berlaku mutlak untuk semua bab (Geometri, Matriks, Kalkulus, Termodinamika, dll).
-3. DILARANG KERAS mengarang, memodifikasi, atau membuat istilah/penjelasan verbal buatanmu sendiri yang tidak ada di dalam standar buku cetak sekolah (hindari kalimat rancu). Penjelasan langkah wajib didasarkan murni pada penurunan operasi matematika yang valid.
-4. tuliskan kesimpulan jawaban akhir secara ringkas tepat satu kali di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
+2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan angka.
+3. WAJIB menggunakan huruf 'x' untuk simbol perkalian pada teks biasa, atau simbol '\\times' jika di dalam rumus LaTeX. DILARANG KERAS menggunakan tanda bintang (*) sebagai simbol perkalian karena akan merusak format teks.
+4. Gunakan format pangkat yang rapi (seperti ² atau ³) pada teks biasa, atau format LaTeX standard seperti $3^2$ agar tercetak sempurna di dokumen.
+5. Berikan pembahasan yang bersih, langsung ke perhitungan inti, dan tuliskan kesimpulan jawaban akhir secara ringkas tepat satu kali di bagian paling bawah.
 Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/matriks/display dengan $$...$$.`;
       
       let pesanKirim = [];
 
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Selesaikan seluruh soal pada gambar ini secara urut.";
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Selesaikan seluruh soal pada gambar ini secara urut menggunakan rumus resmi.";
         pesanKirim.push({
           role: "user",
           content: [
@@ -565,7 +567,6 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         pesanKirim.push({ role: "user", content: `${instruksiPakar}\n\nSoal: ${pertanyaanClean}` });
       }
       
-      // Mengirimkan data gambar langsung ke API Groq menggunakan model Vision andalannya
       const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
         method: 'POST', 
         headers: { 
@@ -576,7 +577,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
           model: "llama-3.2-11b-vision-preview", 
           messages: pesanKirim,
           max_tokens: 4096,      
-          temperature: 0.25,     
+          temperature: 0.15,     
           top_p: 0.95,            
           stream: false           
         })
@@ -589,13 +590,18 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = base64Image ? "Analisis_Soal_Lengkap.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
-        // Memotong tag pikiran rahasia <think> agar tidak ikut tercetak di kertas putih pembahasan
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
+        // 🔥 JARING PENGAMAN otomatis mengubah pangkat ^2, ^3 dan perkalian * jika AI khilaf
+        markdownBersih = markdownBersih
+            .replace(/(\d+)\*(\d+)/g, '$1 x $2') // Mengubah 2*3 menjadi 2 x 3
+            .replace(/(\d+)\^2/g, '$1²')          // Mengubah 3^2 menjadi 3² pada teks biasa
+            .replace(/(\d+)\^3/g, '$1³');         // Mengubah 3^3 menjadi 3³ pada teks biasa
+
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt bridge;".replace(" bridge;", ";")); // Mengamankan karakter HTML tags
+            .replace(/>/g, "&gt;");
 
         const desainHtmlUtuh = `
         <!DOCTYPE html>
