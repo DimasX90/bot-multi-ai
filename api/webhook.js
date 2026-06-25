@@ -466,7 +466,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         }
       }
     }
-      
+
         // [6] MODE NVIDIA VISION
     else if (aiPilihan === "nano") {
       const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
@@ -532,7 +532,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [8] MODE ANALISA TUGAS SEKOLAH - VERSI SUPER AMAN & PRESISI
+    // [8] MODE ANALISA TUGAS SEKOLAH - ANTI-LOOP & FIX RUMUS INTEGRAL PROTECTED
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
@@ -543,12 +543,11 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       
       await kirimPesanTelegram(chatId, "⏳ Nvidia Llama Vision sedang menganalisis tugas sekolahmu...");
       
-      // 🔥 UTAMAKAN PERINTAH POSITIF DAN STRUKTUR YANG JELAS AGAR AI TIDAK GAGAP
-      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains SMA yang praktis. Tugasmu:
-1. Selesaikan soal yang ada pada gambar sesuai kurikulum SMA.
-2. Tuliskan pembahasan langkah demi langkah secara singkat, padat, dan langsung ke rumus utama.
-3. Setelah menuliskan jawaban akhir dari soal tersebut, kamu WAJIB langsung berhenti menulis.
-Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus matriks/baris baru dengan $$...$$.`;
+      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains SMA yang sangat akurat. Tugasmu:
+1. Selesaikan soal pada gambar secara terstruktur sesuai tingkat kurikulum SMA.
+2. Berikan pembahasan runut dan langsung ke inti rumus/perhitungan.
+3. Tuliskan jawaban akhir sekali saja secara ringkas di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
+Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus panjang/matriks dengan $$...$$.`;
       
       const modelTugas = "meta/llama-3.2-11b-vision-instruct"; 
       let pesanKirim = [];
@@ -575,9 +574,9 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus matriks/baris baru den
         body: JSON.stringify({ 
           model: modelTugas, 
           messages: pesanKirim,
-          max_tokens: 2200,      // 🔥 AMANKAN TOKEN KE 2200 AGAR AI TIDAK MEMILIKI RUANG UNTUK LOOPING NONSENS
-          temperature: 0.05,     // 🔥 BUAT MENDEKATI NOL AGAR PIKIRAN AI SANGAT KAKU & PATUH PADA GAMBAR
-          top_p: 0.85,            
+          max_tokens: 2500,      
+          temperature: 0.25,     // 🔥 DINAIKKAN SEDIKIT AGAR AI MEMILIKI LOGIKA MENGHINDARI LOOPING BERULANG
+          top_p: 0.95,            
           stream: false           
         })
       });
@@ -591,7 +590,6 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus matriks/baris baru den
         
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
-        // 🔥 AMANKAN TEKS HTML TANPA MERUSAK STRUKTUR BACKSLASH LATEX ASLI
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
@@ -609,12 +607,39 @@ Format Wajib: Bungkus rumus pendek dengan $...$ dan rumus matriks/baris baru den
             <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
             <script>
               window.MathJax = {
-                tex: { inlineMath: [['$', '$'], ['\\\\(', '\\\\)']], displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']] },
+                tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] },
                 startup: {
                   pageReady: () => {
-                    const rawMarkdown = document.getElementById('raw-markdown').value;
-                    document.getElementById('content').innerHTML = marked.parse(rawMarkdown);
-                    return MathJax.typesetPromise(document.getElementById('content'));
+                    let txt = document.getElementById('raw-markdown').value;
+                    let mathBlocks = [];
+                    
+                    // 🔒 AMANKAN DISPLAY MATH ($$) DARI GANGGUAN MARKED
+                    let partsDD = txt.split("$$");
+                    for (let i = 1; i < partsDD.length; i += 2) {
+                      mathBlocks.push("$$" + partsDD[i] + "$$");
+                      partsDD[i] = "%%DISPLAYMATH_" + (mathBlocks.length - 1) + "%%";
+                    }
+                    txt = partsDD.join("");
+                    
+                    // 🔒 AMANKAN INLINE MATH ($) TERMASUK SIMBOL INTEGRAL UNDERSCORE
+                    let partsD = txt.split("$");
+                    for (let i = 1; i < partsD.length; i += 2) {
+                      mathBlocks.push("$" + partsD[i] + "$");
+                      partsD[i] = "%%INLINEMATH_" + (mathBlocks.length - 1) + "%%";
+                    }
+                    txt = partsD.join("");
+                    
+                    // Proses teks biasa dengan marked tanpa merusak matematika
+                    let parsedHtml = marked.parse(txt);
+                    
+                    // 🔓 KEMBALIKAN SEMUA RUMUS MATEMATIKA YANG UTUH KE TEMPATNYA
+                    for (let i = 0; i < mathBlocks.length; i++) {
+                      parsedHtml = parsedHtml.replace("%%DISPLAYMATH_" + i + "%%", mathBlocks[i]);
+                      parsedHtml = parsedHtml.replace("%%INLINEMATH_" + i + "%%", mathBlocks[i]);
+                    }
+                    
+                    document.getElementById('content').innerHTML = parsedHtml;
+                    return MathJax.typesetPromise([document.getElementById('content')]);
                   }
                 }
               };
