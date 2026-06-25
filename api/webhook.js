@@ -1,7 +1,6 @@
-// 🔥 WAJIB ADA AGAR VERCEL MEMBERI WAKTU 60 DETIK PENUH
-export const maxDuration = 60;
-
-// (Blok "export const config { runtime: 'edge' }" SUDAH DIHAPUS DARI SINI)
+export const config = {
+  runtime: 'edge',
+};
 
 // ==================== CONFIGURATION ====================
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
@@ -15,7 +14,7 @@ const UPSTASH_REST_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 // =======================================================
 
-// 🔥 PERBAIKAN GEMBOK REDIS (Otomatis hilang dalam 10 menit agar database tidak penuh)
+// 🔥 GEMBOK REDIS (Otomatis hilang dalam 10 menit agar database tidak penuh)
 async function setRedis(key, value) {
   await fetch(`${UPSTASH_REST_URL}/set/${key}?EX=600`, {
     method: 'POST',
@@ -32,8 +31,26 @@ async function getRedis(key) {
   return data.result ? JSON.parse(data.result) : null;
 }
 
-// (Fungsi incrRedis sudah dihapus secara permanen dari sini karena kita akan langsung memblokir spam di pintu depan)
+// ================= FUNGSI UTAMA BOT =================
+export default async function handler(request) {
+  if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
+  try {
+    const data = await request.json();
+    
+    // 🔥 GEMBOK ANTI-SPAM BEKERJA DI SINI
+    const updateId = data.update_id;
+    if (updateId) {
+      const cekPesanGanda = await getRedis(`pesan_${updateId}`);
+      if (cekPesanGanda) {
+        return new Response(JSON.stringify({ status: 'ignored_duplicate' }), { status: 200 });
+      }
+      await setRedis(`pesan_${updateId}`, "sedang diproses");
+    }
+
+    const messageData = data.message || {};
+    // ... (SISA KODE KE BAWAH BIARKAN SAMA SEPERTI SEBELUMNYA) ...
+    
 async function cariDiInternet(query) {
   try {
     const response = await fetch("https://api.tavily.com/search", {
