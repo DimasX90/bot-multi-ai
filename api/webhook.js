@@ -544,7 +544,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       await kirimPesanTelegram(chatId, "⏳ AI sedang melakukan Deep Reasoning berbasis Rumus Baku Kurikulum Nasional...");
       
       // 🔥 PROMPT DIPERKETAT: PERINTAHKAN PERKALIAN 'x' DAN LARANG TANDA BINTANG (*)
-      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains SMA Senior yang sangat disiplin, akurat dan komunikatif. Tugasmu:
+      const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA yang sangat disiplin, akurat dan komunikatif. Tugasmu:
 1. Selesaikan atau teruskan pengerjaan soal pada gambar secara terstruktur sesuai tingkat kurikulum SMA nasional.
 2. Fokuskan pembahasan pada alur penurunan rumus, substitusi angka, dan operasi perhitungan matematika yang jelas.
 3. Berikan penjelasan kata-kata yang SINGKAT, PADAT, dan EFISIEN (cukup 1-2 kalimat pendek yang efektif per langkah) untuk memandu siswa memahami alasan perpindahan rumus atau operasi tersebut. Jangan bertele-tele atau menuliskan paragraf teori yang panjang.
