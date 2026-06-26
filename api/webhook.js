@@ -544,7 +544,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       await kirimPesanTelegram(chatId, "⏳ AI sedang melakukan Deep Reasoning berbasis Rumus Baku Kurikulum Nasional...");
       
       // 🔥 PROMPT DIPERKETAT: PERINTAHKAN PERKALIAN 'x' DAN LARANG TANDA BINTANG (*)
-      const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA yang sangat disiplin dan akurat. Tugasmu:
+      const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA yang sangat disiplin, akurat, dan komunikatif. Tugasmu:
 1. Selesaikan soal pada gambar secara ilmiah, logis, dan runut sesuai dengan standar Kurikulum Nasional SMA.
 2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan angka.
 3. WAJIB menggunakan huruf 'x' untuk simbol perkalian pada teks biasa, atau simbol '\\times' jika di dalam rumus LaTeX. DILARANG KERAS menggunakan tanda bintang (*) sebagai simbol perkalian karena akan merusak format teks.
