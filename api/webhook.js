@@ -545,10 +545,11 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       
       // 🔥 PROMPT DIPERKETAT: PERINTAHKAN PERKALIAN 'x' DAN LARANG TANDA BINTANG (*)
       const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA yang sangat disiplin, dan akurat. Tugasmu:
-1. Selesaikan atau teruskan pengerjaan soal pada gambar secara terstruktur sesuai tingkat kurikulum SMA.
-2. Fokuskan pembahasan pada alur penurunan rumus, substitusi angka, dan operasi perhitungan matematika yang jelas.
-3. Berikan penjelasan kata-kata yang SINGKAT, PADAT, (cukup 1-2 kalimat pendek yang efektif per langkah) untuk memandu siswa memahami alasan perpindahan rumus atau operasi tersebut. Jangan bertele-tele atau menuliskan paragraf teori yang panjang.
-4. Tuliskan kesimpulan jawaban akhir secara ringkas tepat satu kali di bagian paling bawah dokumen. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
+1. Selesaikan soal pada gambar secara ilmiah, logis, dan runut sesuai dengan standar Kurikulum Nasional SMA.
+2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan angka.
+3. WAJIB menggunakan huruf 'x' untuk simbol perkalian pada teks biasa, atau simbol '\\times' jika di dalam rumus LaTeX. DILARANG KERAS menggunakan tanda bintang (*) sebagai simbol perkalian karena akan merusak format teks.
+4. Gunakan format pangkat yang rapi (seperti ² atau ³) pada teks biasa, atau format LaTeX standard seperti $3^2$ agar tercetak sempurna di dokumen.
+5. Berikan pembahasan yang bersih, langsung ke perhitungan inti, tuliskan kesimpulan jawaban akhir secara ringkas tepat satu kali di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
 Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/matriks/display dengan $$...$$.`;
       let pesanKirim = [];
 
