@@ -411,7 +411,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [8] MODE ANALISA TUGAS SEKOLAH - MIGRASI UTUH KE GEMINI 2.5 FLASH (ANTI-POTONG)
+    // [8] MODE ANALISA TUGAS SEKOLAH - MIGRASI UTUH KE GEMINI 2.5 FLASH (LAYOUT ANTI-TABRAKAN)
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
@@ -446,7 +446,6 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         pesanKirim.push({ role: "user", content: `${instruksiPakar}\n\nSoal: ${pertanyaanClean}` });
       }
       
-      // 🔥 DIALIHKAN SECARA RESMI KE ENDPOINT COMPATIBLE GEMINI 2.5 FLASH (8192 TOKENS JATAH UTUH)
       const resGeminiTugas = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", { 
         method: 'POST', 
         headers: { 
@@ -472,7 +471,6 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
-        // 🔥 JARING PENGAMAN otomatis mengubah pangkat ^2, ^3 dan perkalian * jika AI khilaf
         markdownBersih = markdownBersih
             .replace(/(\d+)\*(\d+)/g, '$1 x $2') 
             .replace(/(\d+)\^2/g, '$1²')          
@@ -483,7 +481,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
 
-        // 🔒 DESAIN HTML UTUH (Sama sekali tidak diubah sesuai permintaanmu)
+        // 🔒 DESAIN HTML UTUH - UPDATE DESIGN SPACING ANTI-TABRAKAN
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -532,30 +530,40 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
             <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
             <style>
+                /* LAYOUT UTAMA LEBIH LONGGAR DAN ELEGAN */
                 body { 
                     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-                    line-height: 1.6; 
+                    line-height: 1.8; /* Ditambah dari 1.6 agar baris teks tidak menempel */
                     padding: 40px 25px; 
-                    color: #222; 
-                    max-width: 850px; 
+                    color: #23272a; 
+                    max-width: 820px; 
                     margin: 0 auto; 
                     font-size: 16px; 
                     background-color: #ffffff; 
                 }
-                h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 12px; margin-bottom: 30px; text-align: center; }
-                h3 { color: #34495e; margin-top: 25px; border-left: 4px solid #3498db; padding-left: 10px; }
-                ul, ol { padding-left: 22px; }
-                li { margin-bottom: 6px; }
-                p { margin-bottom: 14px; text-align: justify; }
-                hr { border: 0; border-top: 1px solid #eee; margin: 25px 0; }
+                h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 14px; margin-bottom: 35px; text-align: center; }
+                h3 { color: #34495e; margin-top: 35px; margin-bottom: 15px; border-left: 4px solid #3498db; padding-left: 12px; }
+                ul, ol { padding-left: 24px; margin-bottom: 20px; }
+                li { margin-bottom: 10px; text-align: justify; } /* Ditambah margin bawah antar-list */
+                p { margin-bottom: 20px; text-align: justify; } /* Ditambah jarak antar paragraf */
+                hr { border: 0; border-top: 1px solid #eaedf0; margin: 30px 0; }
                 b { color: #111; }
-                .MathJax { overflow-x: auto; overflow-y: hidden; font-size: 105%; }
+                
+                /* ANTI-TABRAKAN KHUSUS FORMULA LATEX */
+                .MathJax { font-size: 105%; color: #1a365d; }
+                mjx-container[display="true"] { 
+                    margin: 25px 0 !important; /* Memberi ruang vertikal kosong di atas & bawah rumus display */
+                    padding: 8px 0;
+                    overflow-x: auto; 
+                    overflow-y: hidden; 
+                }
 
                 @media (max-width: 600px) {
-                    body { padding: 20px 14px; }
-                    h2 { font-size: 22px; margin-bottom: 20px; }
+                    body { padding: 25px 16px; }
+                    h2 { font-size: 22px; margin-bottom: 25px; }
                     p, li { font-size: 15px; }
                     .MathJax { font-size: 98%; }
+                    mjx-container[display="true"] { margin: 20px 0 !important; }
                 }
             </style>
         </head>
@@ -575,8 +583,4 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Gemini:*\n\`${pesanError}\``);
       }
     }
-  } catch (error) {
-    console.error('Error in prosesLatarBelakang:', error);
-  }
-}
-
+    
