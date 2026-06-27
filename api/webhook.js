@@ -545,13 +545,10 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       
       // 🔥 PROMPT TERPADU: KUNCI RUMUS BAKU, TERUSKAN GAMBAR 1, DAN PEMBATASAN KALIMAT PENJELAS
       const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains SMA Senior yang sangat disiplin, akurat, dan komunikatif. Tugasmu:
-1. Analisis soal atau langkah kerja pada gambar pertama, lalu TERUSKAN pengerjaan rumus atau persamaan tersebut secara terstruktur sesuai tingkat Kurikulum Nasional SMA.
-2. Fokuskan pembahasan pada poin-poin alur penurunan rumus baku (General Formula), substitusi angka, dan operasi perhitungan matematika yang jelas.
-3. DILARANG KERAS mengarang, membuat, atau memunculkan variabel atau titik koordinat baru (seperti titik K, L, M, dll) yang tidak tertulis secara eksplisit pada soal atau gambar!
-4. Berikan penjelasan kata-kata yang SINGKAT, PADAT, dan EFISIEN (cukup 1-2 kalimat pendek yang efektif per langkah) hanya sebagai pemandu siswa untuk memahami alasan perpindahan rumus atau operasi tersebut. Jangan bertele-tele atau menuliskan paragraf teori yang panjang.
-5. WAJIB menggunakan huruf 'x' untuk simbol perkalian pada teks biasa, atau simbol '\\times' jika di dalam rumus LaTeX. DILARANG KERAS menggunakan tanda bintang (*) sebagai simbol perkalian.
-6. Gunakan format pangkat yang rapi (seperti ² atau ³) pada teks biasa, atau format LaTeX standard seperti $x^2$ di dalam rumus agar tercetak sempurna.
-7. Tuliskan kesimpulan jawaban akhir secara ringkas tepat satu kali di bagian paling bawah dokumen.
+1. Selesaikan soal pada gambar secara ilmiah, logis, dan runut sesuai dengan standar Kurikulum Nasional SMA.
+2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan angka.
+3. WAJIB menggunakan huruf 'x' untuk simbol perkalian pada teks biasa, atau simbol '\\times' jika di dalam rumus LaTeX. DILARANG KERAS menggunakan tanda bintang (*) sebagai simbol perkalian karena akan merusak format teks.
+4. Gunakan format pangkat yang rapi (seperti ² atau ³) pada teks biasa, atau format LaTeX standard seperti $3^2$ agar tercetak sempurna di dokumen.
 Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/matriks/display dengan $$...$$.`;
       
       let pesanKirim = [];
