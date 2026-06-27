@@ -532,7 +532,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-            // [8] MODE ANALISA TUGAS SEKOLAH - FIX PERKALIAN (x) & PANGKAT SQUARERED (²) VIA QWEN GROQ REASONING
+                // [8] MODE ANALISA TUGAS SEKOLAH - MIGRASI UTUH KE GEMINI 2.5 FLASH (ANTI-POTONG)
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
@@ -541,9 +541,9 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         return;
       }
       
-      await kirimPesanTelegram(chatId, "⏳ AI sedang melakukan Deep Reasoning berbasis Rumus Baku Kurikulum Nasional...");
+      await kirimPesanTelegram(chatId, "⏳ Gemini 2.5 Flash sedang menganalisis soal dan menyusun dokumen pembahasan...");
       
-      // 🔥 PROMPT DIPERKETAT (TIDAK DIUBAH SAMA SEKALI SESUAI PERMINTAANMU)
+      // 🔒 PROMPT UTUH (Sama sekali tidak diubah sesuai permintaanmu)
       const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA Senior yang sangat disiplin dan akurat. Tugasmu:
 1. Selesaikan soal pada gambar secara ilmiah, logis, dan runut sesuai dengan standar Kurikulum Nasional SMA.
 2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan angka.
@@ -567,26 +567,25 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         pesanKirim.push({ role: "user", content: `${instruksiPakar}\n\nSoal: ${pertanyaanClean}` });
       }
       
-      // 🔥 DISESUAIKAN DENGAN PARAMETER RESMI QWEN REASONING DARI SITUS GROQ KAMU
-      const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
+      // 🔥 DIALIHKAN SECARA RESMI KE ENDPOINT COMPATIBLE GEMINI 2.5 FLASH (8192 TOKENS JATAH UTUH)
+      const resGeminiTugas = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", { 
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${GROQ_API_KEY}` 
+          'Authorization': `Bearer ${process.env.GEMINI_API_KEY}` // Pastikan variabel ini sudah ada di Environment Variables Vercel kamu
         }, 
         body: JSON.stringify({ 
-          model: "qwen/qwen3.6-27b",          // Menggunakan model Qwen pilihanmu
+          model: "gemini-2.5-flash", 
           messages: pesanKirim,
-          max_completion_tokens: 4096,      // Menggunakan parameter baru sesuai dokumentasi SDK Groq kamu
-          temperature: 0.6,     
+          max_tokens: 8192,                  // Mengaktifkan jatah maksimal output murni tanpa terpotong
+          temperature: 0.15,                 // Diturunkan ke 0.15 agar hitungan matematika SMA tetap kaku dan presisi
           top_p: 0.95,            
-          reasoning_effort: "default",       // Mengaktifkan parameter penganalisis bawaan model reasoning
           stream: false           
         })
       });
       
-      const groqData = await resGroqTugas.json();
-      const hasilTugas = groqData.choices?.[0]?.message?.content;
+      const geminiData = await resGeminiTugas.json();
+      const hasilTugas = geminiData.choices?.[0]?.message?.content;
       
       if (hasilTugas) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
@@ -596,16 +595,16 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         
         // 🔥 JARING PENGAMAN otomatis mengubah pangkat ^2, ^3 dan perkalian * jika AI khilaf
         markdownBersih = markdownBersih
-            .replace(/(\d+)\*(\d+)/g, '$1 x $2') // Mengubah 2*3 menjadi 2 x 3
-            .replace(/(\d+)\^2/g, '$1²')          // Mengubah 3^2 menjadi 3² pada teks biasa
-            .replace(/(\d+)\^3/g, '$1³');         // Mengubah 3^3 menjadi 3³ pada teks biasa
+            .replace(/(\d+)\*(\d+)/g, '$1 x $2') 
+            .replace(/(\d+)\^2/g, '$1²')          
+            .replace(/(\d+)\^3/g, '$1³');         
 
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
 
-        // 🔥 DESAIN HTML UTUH (TIDAK DIUBAH SAMA SEKALI SESUAI PERMINTAANMU)
+        // 🔒 DESAIN HTML UTUH (Sama sekali tidak diubah sesuai permintaanmu)
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -693,8 +692,8 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
 
         await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil pembahasan matematika kurikulum SMA`);
       } else {
-        const pesanError = groqData.error?.message || JSON.stringify(groqData);
-        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Groq:*\n\`${pesanError}\``);
+        const pesanError = geminiData.error?.message || JSON.stringify(geminiData);
+        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Gemini:*\n\`${pesanError}\``);
       }
     }
     
