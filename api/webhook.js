@@ -309,9 +309,9 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         await setRedis(`memori_${chatId}`, riwayatChat.slice(-16));
       }
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
-    }
+      }
 
-    // [5] MODE SUPER KILAT VIA LLAMA 4 SCOUT (GROQ)
+      // [5] MODE SUPER KILAT VIA LLAMA 4 SCOUT (GROQ)
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ Llama Scout (via Groq) sedang merangkai jawaban kilat...");
@@ -346,128 +346,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       }
     }
 
-        // [6] MODE NVIDIA VISION
-    else if (aiPilihan === "nano") {
-      const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
-      await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang menganalisis pesan...");
-      let riwayatNano = [];
-
-      if (isImage && base64Image) {
-        let konten = [
-          { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
-          { type: "text", text: pertanyaanClean }
-        ];
-
-        try {
-          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
-            body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: [{ role: "user", content: konten }], max_tokens: 700 })
-          });
-          
-          const data = await res.json();
-          const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
-          if (!jawaban.startsWith("⚠️")) {
-            riwayatNano.push({ role: "user", content: `[Melihat Gambar]: ${pertanyaanClean}` });
-            riwayatNano.push({ role: "assistant", content: jawaban });
-            await setRedis(`memori_nano_${chatId}`, riwayatNano);
-          }
-          await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
-        } catch (err) {
-          await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan atau timeout saat membaca gambar.");
-        }
-      } 
-      else {
-        riwayatNano = await getRedis(`memori_nano_${chatId}`) || [];
-        riwayatNano.push({ role: "user", content: pertanyaanClean });
-
-        try {
-          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
-            body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: riwayatNano, max_tokens: 700 })
-          });
-          
-          const data = await res.json();
-          const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
-          if (!jawaban.startsWith("⚠️")) {
-            riwayatNano.push({ role: "assistant", content: jawaban });
-            if (riwayatNano.length > 8) riwayatNano = riwayatNano.slice(-8);
-            await setRedis(`memori_nano_${chatId}`, riwayatNano);
-          }
-          await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
-        } catch (err) {
-          await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan saat memproses obrolan teks.");
-        }
-      }
-    }
-      
-    // [7] MODE PENCARIAN GAMBAR PEXELS (SUDAH DIPERBAIKI)
-    else if (aiPilihan === "gambar") {
-      const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
-      if (!promptGambar) return;
-      await kirimPesanTelegram(chatId, "⏳ Mencari foto...");
-      const resPexels = await (await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1`, { headers: { "Authorization": "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq" } })).json();
-      if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
-    }
-
-        // [6] MODE NVIDIA VISION
-    else if (aiPilihan === "nano") {
-      const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
-      await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang menganalisis pesan...");
-      let riwayatNano = [];
-
-      if (isImage && base64Image) {
-        let konten = [
-          { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
-          { type: "text", text: pertanyaanClean }
-        ];
-
-        try {
-          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
-            body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: [{ role: "user", content: konten }], max_tokens: 700 })
-          });
-          
-          const data = await res.json();
-          const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
-          if (!jawaban.startsWith("⚠️")) {
-            riwayatNano.push({ role: "user", content: `[Melihat Gambar]: ${pertanyaanClean}` });
-            riwayatNano.push({ role: "assistant", content: jawaban });
-            await setRedis(`memori_nano_${chatId}`, riwayatNano);
-          }
-          await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
-        } catch (err) {
-          await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan atau timeout saat membaca gambar.");
-        }
-      } 
-      else {
-        riwayatNano = await getRedis(`memori_nano_${chatId}`) || [];
-        riwayatNano.push({ role: "user", content: pertanyaanClean });
-
-        try {
-          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
-            body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: riwayatNano, max_tokens: 700 })
-          });
-          
-          const data = await res.json();
-          const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
-          if (!jawaban.startsWith("⚠️")) {
-            riwayatNano.push({ role: "assistant", content: jawaban });
-            if (riwayatNano.length > 8) riwayatNano = riwayatNano.slice(-8);
-            await setRedis(`memori_nano_${chatId}`, riwayatNano);
-          }
-          await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
-        } catch (err) {
-          await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan saat memproses obrolan teks.");
-        }
-      }
-    }
-
-        // [6] MODE NVIDIA VISION
+    // [6] MODE NVIDIA VISION
     else if (aiPilihan === "nano") {
       const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
       await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang menganalisis pesan...");
@@ -532,7 +411,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-                // [8] MODE ANALISA TUGAS SEKOLAH - MIGRASI UTUH KE GEMINI 2.5 FLASH (ANTI-POTONG)
+    // [8] MODE ANALISA TUGAS SEKOLAH - MIGRASI UTUH KE GEMINI 2.5 FLASH (ANTI-POTONG)
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
@@ -572,13 +451,13 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${process.env.GEMINI_API_KEY}` // Pastikan variabel ini sudah ada di Environment Variables Vercel kamu
+          'Authorization': `Bearer ${process.env.GEMINI_API_KEY}` 
         }, 
         body: JSON.stringify({ 
           model: "gemini-2.5-flash", 
           messages: pesanKirim,
-          max_tokens: 8192,                  // Mengaktifkan jatah maksimal output murni tanpa terpotong
-          temperature: 0.15,                 // Diturunkan ke 0.15 agar hitungan matematika SMA tetap kaku dan presisi
+          max_tokens: 8192,                  
+          temperature: 0.15,                 
           top_p: 0.95,            
           stream: false           
         })
@@ -696,4 +575,8 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Gemini:*\n\`${pesanError}\``);
       }
     }
-    
+  } catch (error) {
+    console.error('Error in prosesLatarBelakang:', error);
+  }
+}
+
