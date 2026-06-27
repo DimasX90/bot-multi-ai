@@ -532,7 +532,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [8] MODE ANALISA TUGAS SEKOLAH - FIX PERKALIAN (x) & PANGKAT SQUARERED (²)
+        // [8] MODE ANALISA TUGAS SEKOLAH - CONFIG REASONING QWEN 3.6 27B & FINETUNED PROMPT
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       
@@ -541,20 +541,24 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         return;
       }
       
-      await kirimPesanTelegram(chatId, "⏳ AI sedang melakukan Deep Reasoning berbasis Rumus Baku Kurikulum Nasional...");
+      await kirimPesanTelegram(chatId, "⏳ Qwen 3.6 sedang melakukan Deep Reasoning berbasis Rumus Baku & Penjelasan Efisien...");
       
-      // 🔥 PROMPT DIPERKETAT: PERINTAHKAN PERKALIAN 'x' DAN LARANG TANDA BINTANG (*)
-      const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA yang sangat disiplin, akurat, dan komunikatif. Tugasmu:
-1. Selesaikan soal pada gambar secara ilmiah, logis, dan runut sesuai dengan standar Kurikulum Nasional SMA.
-2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan angka.
-3. WAJIB menggunakan huruf 'x' untuk simbol perkalian pada teks biasa, atau simbol '\\times' jika di dalam rumus LaTeX. DILARANG KERAS menggunakan tanda bintang (*) sebagai simbol perkalian karena akan merusak format teks.
-4. Gunakan format pangkat yang rapi (seperti ² atau ³) pada teks biasa, atau format LaTeX standard seperti $3^2$ agar tercetak sempurna di dokumen.
-5. Berikan pembahasan yang bersih, langsung ke perhitungan inti, tuliskan kesimpulan jawaban akhir secara ringkas tepat satu kali di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
+      // 🔥 PROMPT TERPADU: KUNCI RUMUS BAKU, TERUSKAN GAMBAR 1, DAN PEMBATASAN KALIMAT PENJELAS
+      const instruksiPakar = `Kamu adalah Pakar Pendidikan dan Guru Matematika/Sains SMA Senior yang sangat disiplin, akurat, dan komunikatif. Tugasmu:
+1. Analisis soal atau langkah kerja pada gambar pertama, lalu TERUSKAN pengerjaan rumus atau persamaan tersebut secara terstruktur sesuai tingkat Kurikulum Nasional SMA.
+2. Fokuskan pembahasan pada poin-poin alur penurunan rumus baku (General Formula), substitusi angka, dan operasi perhitungan matematika yang jelas.
+3. DILARANG KERAS mengarang, membuat, atau memunculkan variabel atau titik koordinat baru (seperti titik K, L, M, dll) yang tidak tertulis secara eksplisit pada soal atau gambar!
+4. Berikan penjelasan kata-kata yang SINGKAT, PADAT, dan EFISIEN (cukup 1-2 kalimat pendek yang efektif per langkah) hanya sebagai pemandu siswa untuk memahami alasan perpindahan rumus atau operasi tersebut. Jangan bertele-tele atau menuliskan paragraf teori yang panjang.
+5. WAJIB menggunakan huruf 'x' untuk simbol perkalian pada teks biasa, atau simbol '\\times' jika di dalam rumus LaTeX. DILARANG KERAS menggunakan tanda bintang (*) sebagai simbol perkalian.
+6. Gunakan format pangkat yang rapi (seperti ² atau ³) pada teks biasa, atau format LaTeX standard seperti $x^2$ di dalam rumus agar tercetak sempurna.
+7. Tuliskan kesimpulan jawaban akhir secara ringkas tepat satu kali di bagian paling bawah dokumen.
 Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/matriks/display dengan $$...$$.`;
+      
       let pesanKirim = [];
 
       if (base64Image) {
-        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Selesaikan seluruh soal pada gambar ini secara urut menggunakan rumus resmi.";
+        // Otomatis memerintahkan AI untuk mengenali dan melanjutkan rumus pada foto yang dikirim
+        const teksPrompt = pertanyaanClean ? pertanyaanClean : "Perhatikan gambar pertama, teruskan atau selesaikan pengerjaan rumus tersebut dengan penjelasan singkat.";
         pesanKirim.push({
           role: "user",
           content: [
@@ -566,6 +570,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         pesanKirim.push({ role: "user", content: `${instruksiPakar}\n\nSoal: ${pertanyaanClean}` });
       }
       
+      // 🔥 SINKRONISASI PARAMETER REASONING SESUAI SDK RESMI QWEN GROQ KAMU
       const resGroqTugas = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
         method: 'POST', 
         headers: { 
@@ -573,12 +578,13 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
           'Authorization': `Bearer ${GROQ_API_KEY}` 
         }, 
         body: JSON.stringify({ 
-          model: "llama-3.2-11b-vision-preview", 
+          model: "qwen/qwen3.6-27b",          // Mengaktifkan Qwen 3.6 27B asli pilihanmu
           messages: pesanKirim,
-          max_tokens: 4096,      
-          temperature: 0.15,     
+          max_completion_tokens: 4096,      // Menggunakan parameter baru penampung token reasoning
+          temperature: 0.15,                 // Suhu rendah agar logika berpikir kaku dan akurat matematis
           top_p: 0.95,            
-          stream: false           
+          reasoning_effort: "default",       // Mengaktifkan daya analisis mendalam bawaan Qwen
+          stream: false                      // Wajib false agar server menangkap respon utuh untuk dicetak ke HTML
         })
       });
       
@@ -587,15 +593,15 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
       
       if (hasilTugas) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
-        const namaFileHasil = base64Image ? "Analisis_Soal_Lengkap.html" : "Tugas_Sekolah_Siap_Cetak.html";
+        const namaFileHasil = base64Image ? "Pembahasan_Soal_Efisien.html" : "Tugas_Sekolah_Siap_Cetak.html";
         
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
-        // 🔥 JARING PENGAMAN otomatis mengubah pangkat ^2, ^3 dan perkalian * jika AI khilaf
+        // 🔒 JARING PENGAMAN: Mengonversi tanda perkalian/pangkat teks biasa jika AI khilaf
         markdownBersih = markdownBersih
-            .replace(/(\d+)\*(\d+)/g, '$1 x $2') // Mengubah 2*3 menjadi 2 x 3
-            .replace(/(\d+)\^2/g, '$1²')          // Mengubah 3^2 menjadi 3² pada teks biasa
-            .replace(/(\d+)\^3/g, '$1³');         // Mengubah 3^3 menjadi 3³ pada teks biasa
+            .replace(/(\d+)\*(\d+)/g, '$1 x $2')
+            .replace(/(\d+)\^2/g, '$1²')
+            .replace(/(\d+)\^3/g, '$1³');
 
         const amanUntukHtml = markdownBersih
             .replace(/&/g, "&amp;")
@@ -650,6 +656,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
             <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
             <style>
+                /* LAYOUT PUTIH MENYELURUH DI PC & RESPONSIF DI HP */
                 body { 
                     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
                     line-height: 1.6; 
@@ -663,17 +670,17 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
                 h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 12px; margin-bottom: 30px; text-align: center; }
                 h3 { color: #34495e; margin-top: 25px; border-left: 4px solid #3498db; padding-left: 10px; }
                 ul, ol { padding-left: 22px; }
-                li { margin-bottom: 6px; }
+                li { margin-bottom: 8px; }
                 p { margin-bottom: 14px; text-align: justify; }
                 hr { border: 0; border-top: 1px solid #eee; margin: 25px 0; }
                 b { color: #111; }
-                .MathJax { overflow-x: auto; overflow-y: hidden; font-size: 105%; }
+                .MathJax { overflow-x: auto; overflow-y: hidden; font-size: 105%; color: #1a365d; }
 
                 @media (max-width: 600px) {
                     body { padding: 20px 14px; }
                     h2 { font-size: 22px; margin-bottom: 20px; }
                     p, li { font-size: 15px; }
-                    .MathJax { font-size: 98%; }
+                    .MathJax { font-size: 100%; }
                 }
             </style>
         </head>
