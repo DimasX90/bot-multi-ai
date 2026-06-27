@@ -576,7 +576,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
           model: "llama-3.2-11b-vision-preview", 
           messages: pesanKirim,
           max_tokens: 4096,      
-          temperature: 0.15,     
+          temperature: 0.20,     
           top_p: 0.95,            
           stream: false           
         })
