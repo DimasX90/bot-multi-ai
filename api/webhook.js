@@ -548,7 +548,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
 1. Selesaikan soal pada gambar secara ilmiah, logis, dan runut sesuai dengan standar Kurikulum Nasional SMA.
 2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan angka.
 3. WAJIB menggunakan huruf 'x' untuk simbol perkalian pada teks biasa, atau simbol '\\times' jika di dalam rumus LaTeX. DILARANG KERAS menggunakan tanda bintang (*) sebagai simbol perkalian karena akan merusak format teks.
-4. Gunakan format pangkat yang rapi (seperti ² atau ³) pada teks biasa, atau format LaTeX standard seperti $3^2$ agar tercetak sempurna di dokumen.
+4. Gunakan format pangkat yang rapi (seperti ² atau ³) pada teks biasa, atau format LaTeX standard seperti $3^2$ agar tercetak sempurna di dokumen. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
 Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/matriks/display dengan $$...$$.`;
       
       let pesanKirim = [];
