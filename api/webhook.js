@@ -471,6 +471,14 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
         
+        // 🔥 PENERJEMAH LATEX KUSTOM: Mengubah format \[ \] dan \( \) milik Gemini menjadi $$ dan $
+        markdownBersih = markdownBersih
+            .replace(/\\\[/g, '$$$$')
+            .replace(/\\\]/g, '$$$$')
+            .replace(/\\\(/g, '$')
+            .replace(/\\\)/g, '$');
+        
+        // 🔒 JARING PENGAMAN UTUH
         markdownBersih = markdownBersih
             .replace(/(\d+)\*(\d+)/g, '$1 x $2') 
             .replace(/(\d+)\^2/g, '$1²')          
@@ -481,7 +489,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
 
-        // 🔒 DESAIN HTML UTUH - UPDATE DESIGN SPACING ANTI-TABRAKAN
+        // 🔒 DESAIN HTML UTUH TATA LETAK LONGGAR
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -530,10 +538,9 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
             <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
             <style>
-                /* LAYOUT UTAMA LEBIH LONGGAR DAN ELEGAN */
                 body { 
                     font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-                    line-height: 1.8; /* Ditambah dari 1.6 agar baris teks tidak menempel */
+                    line-height: 1.8; 
                     padding: 40px 25px; 
                     color: #23272a; 
                     max-width: 820px; 
@@ -544,15 +551,14 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
                 h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 14px; margin-bottom: 35px; text-align: center; }
                 h3 { color: #34495e; margin-top: 35px; margin-bottom: 15px; border-left: 4px solid #3498db; padding-left: 12px; }
                 ul, ol { padding-left: 24px; margin-bottom: 20px; }
-                li { margin-bottom: 10px; text-align: justify; } /* Ditambah margin bawah antar-list */
-                p { margin-bottom: 20px; text-align: justify; } /* Ditambah jarak antar paragraf */
+                li { margin-bottom: 10px; text-align: justify; } 
+                p { margin-bottom: 20px; text-align: justify; } 
                 hr { border: 0; border-top: 1px solid #eaedf0; margin: 30px 0; }
                 b { color: #111; }
                 
-                /* ANTI-TABRAKAN KHUSUS FORMULA LATEX */
                 .MathJax { font-size: 105%; color: #1a365d; }
                 mjx-container[display="true"] { 
-                    margin: 25px 0 !important; /* Memberi ruang vertikal kosong di atas & bawah rumus display */
+                    margin: 25px 0 !important; 
                     padding: 8px 0;
                     overflow-x: auto; 
                     overflow-y: hidden; 
@@ -582,5 +588,4 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         const pesanError = geminiData.error?.message || JSON.stringify(geminiData);
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Gemini:*\n\`${pesanError}\``);
       }
-    }
-    
+          }
