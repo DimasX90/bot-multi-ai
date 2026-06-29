@@ -150,6 +150,7 @@ export default async function handler(request, context) {
                          `🎨 *@gambar [prompt]* -> Cari foto berkualitas tinggi via Pexels\n` +
                          `✨ *@edit [foto]* -> Perbagus foto dengan AI Racikan Kustom\n` +
                          `📝 *@AnalisaTugas [soal/foto]* -> Asisten cerdas tugas sekolah & bedah matematika\n\n` +
+                          📚 *@tugasumum [teks/foto/pdf]* -> Jawab tugas non-matematika & bedah file PDF\n\n` +
                          `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@AnalisaTugas kerjakan\``;
                          
       await kirimPesanTelegram(chatId, teksSambut);
@@ -166,6 +167,9 @@ export default async function handler(request, context) {
     else if (pesanLowercase.includes("@gambar")) { aiPilihan = "gambar"; await setRedis(`sesi_${chatId}`, aiPilihan); }
     else if (pesanLowercase.includes("@edit")) { aiPilihan = "edit"; await setRedis(`sesi_${chatId}`, aiPilihan); }
     else if (pesanLowercase.includes("@analisatugas")) { aiPilihan = "analisatugas"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@analisatugas")) { aiPilihan = "analisatugas"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@tugasumum")) { aiPilihan = "tugasumum"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    
 
     if (!aiPilihan) {
       await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, atau \`@AnalisaTugas\` (kirim foto)");
@@ -200,6 +204,14 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       isImage = true;
     }
 
+     // 👇 KODE BARU: MENANGKAP FILE PDF YANG DIKIRIM USER
+    let isPdf = false;
+    let pdfBase64 = null;
+    if (dokumenMasuk && dokumenMasuk.mime_type === 'application/pdf') {
+      fileIdToDownload = dokumenMasuk.file_id;
+      isPdf = true;
+    }
+    
     let imageBuffer = null;
     let base64Image = null;
     
@@ -210,7 +222,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
         const resStream = await fetch(fileUrl);
         imageBuffer = await resStream.arrayBuffer();
-        if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "analisatugas") {
+        if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "analisatugas" | aiPilihan === "tugasumum") {
           base64Image = Buffer.from(imageBuffer).toString('base64');
         }
       }
@@ -589,3 +601,44 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Gemini:*\n\`${pesanError}\``);
       }
           }
+
+          // 👇 TARUH KODE INI TEPAT DI BAWAH PENUTUP BLOK @analisatugas KAMU
+    else if (aiPilihan === "tugasumum") {
+      const pertanyaanClean = pesanUser.replace(/@tugasumum/gi, '').trim();
+      
+      if (!pertanyaanClean && !base64Image && !pdfBase64) {
+        await kirimPesanTelegram(chatId, "📚 *Saluran Tugas Umum Aktif!*\nSilakan ketik pertanyaan, kirim foto soal, atau langsung lampirkan file dokumen PDF tugasmu ke sini.");
+        return;
+      }
+      
+      await kirimPesanTelegram(chatId, "⏳ Gemini sedang membaca referensi dokumen dan menyusun jawaban tugas...");
+      
+      const instruksiUmum = `Kamu adalah Asisten Akademik, Guru Multidisiplin, dan Pakar Pendidikan Senior. 
+Tugasmu adalah menjawab pertanyaan atau menganalisis dokumen/gambar yang dikirimkan untuk materi non-matematika (seperti Sejarah, Biologi, Geografi, Bahasa, Sosiologi, dll).
+Berikan jawaban dalam bahasa Indonesia yang sangat rapi, gunakan format Markdown poin-poin (bullet points) agar mudah dipelajari, berwawasan luas, objektif, dan langsung menjawab inti tugas ilmiah tanpa basa-basi pembuka.`;
+
+      let isiKonten = [{ text: `${instruksiUmum}\n\nPertanyaan/Perintah Tugas: ${pertanyaanClean || "Analisislah file referensi dokumen ini secara lengkap."}` }];
+      
+      if (base64Image) {
+        isiKonten.push({ inline_data: { mime_type: "image/jpeg", data: base64Image } });
+      }
+      if (pdfBase64) {
+        isiKonten.push({ inline_data: { mime_type: "application/pdf", data: pdfBase64 } });
+      }
+      
+      const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ role: "user", parts: isiKonten }] })
+      });
+      
+      const resData = await resGemini.json();
+      const jawabanTugas = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (jawabanTugas) {
+        await kirimPesanTelegram(chatId, `📖 *Hasil Pembahasan Tugas Kustom*:\n\n${jawabanTugas}`);
+      } else {
+        await kirimPesanTelegram(chatId, `❌ Gagal memproses dokumen tugas. Google API merespon: ${JSON.stringify(resData).substring(0, 150)}`);
+      }
+    }
+    
