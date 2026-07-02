@@ -365,6 +365,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       const resPexels = await (await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1`, { headers: { "Authorization": "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq" } })).json();
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
+   }
 
     // [8] MODE ANALISA TUGAS SEKOLAH - NATIVE API GEMINI (DUKUNG FOTO & PDF)
     else if (aiPilihan === "analisatugas") {
@@ -376,7 +377,6 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       
       await kirimPesanTelegram(chatId, "⏳ Gemini 2.5 Flash sedang menganalisis soal/dokumen dan menyusun dokumen pembahasan...");
       
-      // 🔒 PROMPT UTUH MILIKMU (Sama sekali tidak diubah sesuai ketentuan)
       const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA Senior yang sangat disiplin dan akurat. Tugasmu:
 1. Selesaikan soal pada gambar secara ilmiah, logis, dan runut sesuai dengan standar Kurikulum Nasional SMA.
 2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan angka. lalu teruskan pengerjaan rumus atau persamaan matematika tersebut selangkah demi selangkah hingga selesai sempurna
@@ -389,7 +389,6 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
       if (base64Image) isiKonten.push({ inline_data: { mime_type: "image/jpeg", data: base64Image } });
       if (pdfBase64) isiKonten.push({ inline_data: { mime_type: "application/pdf", data: pdfBase64 } });
       
-      // Mengaktifkan Jalur Native API Gemini agar bisa memproses PDF matematika secara langsung
       const resGeminiTugas = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, { 
         method: 'POST', headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ contents: [{ role: "user", parts: isiKonten }], generationConfig: { maxOutputTokens: 8192, temperature: 0.15, topP: 0.95 } })
@@ -408,7 +407,6 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
 
         const amanUntukHtml = markdownBersih.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-        // 🔒 DESAIN HTML UTUH TATA LETAK LONGGAR ANTI-TABRAKAN
         const desainHtmlUtuh = `
         <!DOCTYPE html>
         <html lang="id">
@@ -497,12 +495,14 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
       const resData = await resGemini.json();
       const jawabanTugas = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       
-      if (jawabanTugas) await kirimPesanTelegram(chatId, `📖 *Hasil Pembahasan Tugas Kustom*:\n\n${jawabanTugas}`);
-      else await kirimPesanTelegram(chatId, `❌ Gagal memproses dokumen tugas.`);
+      if (jawabanTugas) {
+        await kirimPesanTelegram(chatId, `📖 *Hasil Pembahasan Tugas Kustom*:\n\n${jawabanTugas}`);
+      } else {
+        await kirimPesanTelegram(chatId, `❌ Gagal memproses dokumen tugas.`);
+      }
     }
 
   } catch (error) {
     console.error('Error in prosesLatarBelakang:', error);
   }
 }
-
