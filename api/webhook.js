@@ -174,7 +174,7 @@ export default async function handler(request, context) {
     console.error('Main handler error:', error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 500 });
   }
-  }
+}
 
 // ================= FUNGSI PROSES DI LATAR BELAKANG (BACKGROUND WORKER) =================
 async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase, fotoMasuk, dokumenMasuk) {
@@ -199,6 +199,25 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         isImage = true;
       }
     }
+    
+    let imageBuffer = null;
+    let base64Image = null;
+    
+    // 🔥 FIX: Jalur download dibuka agar bisa mengunduh file gambar DAN pdf sekaligus
+    if ((isImage || isPdf) && fileIdToDownload) {
+      const resFile = await (await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${fileIdToDownload}`)).json();
+      if (resFile.ok) {
+        const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
+        const resStream = await fetch(fileUrl);
+        imageBuffer = await resStream.arrayBuffer();
+        
+        // 🔥 FIX: Distribusi data base64 gambar dan pdf agar dibaca lancar oleh Gemini
+        if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "analisatugas" || aiPilihan === "tugasumum") {
+          if (isImage) base64Image = Buffer.from(imageBuffer).toString('base64');
+          if (isPdf) pdfBase64 = Buffer.from(imageBuffer).toString('base64');
+        }
+      }
+}
     
     let imageBuffer = null;
     let base64Image = null;
