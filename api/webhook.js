@@ -364,7 +364,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       await kirimPesanTelegram(chatId, "⏳ Mencari foto...");
       const resPexels = await (await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1`, { headers: { "Authorization": "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq" } })).json();
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
-            }
+      }
 
       // [8] MODE ANALISA TUGAS SEKOLAH - NATIVE API GEMINI (DUKUNG FOTO & PDF)
     else if (aiPilihan === "analisatugas") {
