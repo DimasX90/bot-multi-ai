@@ -302,7 +302,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
       }
 
-      // [5] MODE SUPER KILAT VIA LLAMA 4 SCOUT (GROQ)
+    // [5] MODE SUPER KILAT VIA LLAMA 4 SCOUT (GROQ)
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ Llama Scout (via Groq) sedang merangkai jawaban kilat...");
@@ -357,17 +357,16 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       }
     }
       
-    // [7] MODE PENCARIAN GAMBAR PEXELS
+    // [7] MODE PENCARIAN GAMBAR PEXELS (PEMBERSIHAN KURUNG BERHASIL)
     else if (aiPilihan === "gambar") {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
       if (!promptGambar) return;
       await kirimPesanTelegram(chatId, "⏳ Mencari foto...");
       const resPexels = await (await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1`, { headers: { "Authorization": "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq" } })).json();
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
-    }
-   }
+            }
 
-    // [8] MODE ANALISA TUGAS SEKOLAH - NATIVE API GEMINI (DUKUNG FOTO & PDF)
+      // [8] MODE ANALISA TUGAS SEKOLAH - NATIVE API GEMINI (DUKUNG FOTO & PDF)
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
       if (!pertanyaanClean && !base64Image && !pdfBase64) {
@@ -482,7 +481,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         return;
       }
       
-      await kirimPesanTelegram(chatId, "⏳ Gemini sedang membaca referensi dokumen dan menyusun jawaban tugas...");
+      await kirimPesanTelegram(chatId, "⏳ Gemini sedang membaca referensi dokumen and menyusun jawaban tugas...");
       const instruksiUmum = `Kamu adalah Asisten Academic, Guru Multidisiplin, dan Pakar Pendidikan Senior. Tugasmu adalah menjawab pertanyaan untuk materi non-matematika (Sejarah, Biologi, Bahasa, dll). Jawab menggunakan format Markdown poin-poin rapi tanpa basa-basi pembuka.`;
 
       let isiKonten = [{ text: `${instruksiUmum}\n\nPertanyaan/Perintah Tugas: ${pertanyaanClean || "Analisislah file referensi dokumen ini secara lengkap."}` }];
