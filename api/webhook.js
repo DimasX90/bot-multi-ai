@@ -114,14 +114,10 @@ export default async function handler(request, context) {
 
   try {
     const data = await request.json();
-    
-    // 🔥 GEMBOK ANTI-SPAM
     const updateId = data.update_id;
     if (updateId) {
       const cekPesanGanda = await getRedis(`pesan_${updateId}`);
-      if (cekPesanGanda) {
-        return new Response(JSON.stringify({ status: 'ignored_duplicate' }), { status: 200 });
-      }
+      if (cekPesanGanda) return new Response(JSON.stringify({ status: 'ignored_duplicate' }), { status: 200 });
       await setRedis(`pesan_${updateId}`, "sedang diproses");
     }
 
@@ -129,7 +125,6 @@ export default async function handler(request, context) {
     const chatId = messageData.chat?.id;
     const pesanUser = messageData.text || messageData.caption || "";
     const pesanLowercase = pesanUser.toLowerCase().trim();
-    
     const fotoMasuk = messageData.photo;
     const dokumenMasuk = messageData.document;
 
@@ -137,7 +132,6 @@ export default async function handler(request, context) {
       return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
     }
     
-    // JIKA MENGETIK /START, BALAS LANGSUNG INSTAN (FIXED BACKTICK LITERAL)
     if (pesanLowercase === "/start") {
       await setRedis(`sesi_${chatId}`, ""); 
       const teksSambut = `✨ *Selamat Datang di Multiple AI Response Bot!* ✨\n` +
@@ -151,11 +145,35 @@ export default async function handler(request, context) {
                          `✨ *@edit [foto]* -> Perbagus foto dengan AI Racikan Kustom\n` +
                          `📝 *@analisatugas [soal/foto/pdf]* -> Asisten cerdas matematika & bedah soal PDF\n` +
                          `📚 *@tugasumum [teks/foto/pdf]* -> Jawab tugas non-matematika & bedah file PDF\n\n` +
-                         `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim file soal dengan caption \`@analisatugas kerjakan\``;
+                         `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@analisatugas kerjakan\``;
                          
       await kirimPesanTelegram(chatId, teksSambut);
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
+
+    let aiPilihan = await getRedis(`sesi_${chatId}`);
+    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) { aiPilihan = "search"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@gemini") || (fotoMasuk && pesanUser === "" && aiPilihan !== "edit")) { aiPilihan = "gemini"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) { aiPilihan = "groq"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@super")) { aiPilihan = "super"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@nano")) { aiPilihan = "nano"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@gambar")) { aiPilihan = "gambar"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@edit")) { aiPilihan = "edit"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@analisatugas")) { aiPilihan = "analisatugas"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+    else if (pesanLowercase.includes("@tugasumum")) { aiPilihan = "tugasumum"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+
+    if (!aiPilihan) {
+      await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: \`@search berita terkini\`, \`@gemini halo\`, atau \`@analisatugas\` (kirim foto/pdf)");
+      return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
+    }
+
+    context.waitUntil(prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase, fotoMasuk, dokumenMasuk));
+    return new Response(JSON.stringify({ status: 'queued_in_background' }), { status: 200 });
+
+  } catch (error) {
+    console.error('Main handler error:', error);
+    return new Response(JSON.stringify({ status: 'error' }), { status: 500 });
+  }
   }
 
 // ================= FUNGSI PROSES DI LATAR BELAKANG (BACKGROUND WORKER) =================
@@ -207,11 +225,8 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       }
       await kirimPesanTelegram(chatId, "🪄 AI sedang mengolah fotomu dengan racikan kustom...");
       const linkHasil = await uploadCloudinaryKustom(imageBuffer, pesanLowercase);
-      if (linkHasil) {
-        await kirimFotoTelegramURL(chatId, linkHasil, "✨ Hasil perbaikan foto kamu sudah siap!");
-      } else {
-        await kirimPesanTelegram(chatId, "❌ Gagal memproses gambar di Cloudinary.");
-      }
+      if (linkHasil) await kirimFotoTelegramURL(chatId, linkHasil, "✨ Hasil perbaikan foto kamu sudah siap!");
+      else await kirimPesanTelegram(chatId, "❌ Gagal memproses gambar di Cloudinary.");
     }
       
     // [2] MODE GEMINI MULTIMODAL
@@ -221,13 +236,8 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
       let memoriMentah = [];
-      
-      if (base64Image) {
-         await setRedis(`memori_gemini_${chatId}`, []); 
-         memoriMentah = []; 
-      } else {
-         memoriMentah = await getRedis(`memori_gemini_${chatId}`) || [];
-      }
+      if (base64Image) { await setRedis(`memori_gemini_${chatId}`, []); memoriMentah = []; }
+      else { memoriMentah = await getRedis(`memori_gemini_${chatId}`) || []; }
 
       let formatGemini = memoriMentah.map(msg => ({ role: msg.role, parts: [{ text: msg.content }] }));
       let partsSaatIni = [{ text: pertanyaanClean }];
@@ -238,11 +248,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini })
       });
       const resData = await resGemini.json();
-      
-      let jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!jawaban) {
-         jawaban = `⚠️ Respon tidak dikenali.\n\nAlasan dari Google:\n${JSON.stringify(resData).substring(0, 300)}`;
-      }
+      let jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Respon tidak dikenali.";
 
       if (!jawaban.startsWith("⚠️")) {
           memoriMentah.push({ role: "user", content: pertanyaanClean });
@@ -252,70 +258,41 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
     }
 
-      // [3] MODE PERPLEXITY (BROWSING + GROQ)
+    // [3] MODE PERPLEXITY (BROWSING + GROQ)
     else if (aiPilihan === "search") {
       const kueriPencarian = pesanUser.replace(/@search|\/search/gi, '').trim();
-      if (!kueriPencarian) {
-        await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian.");
-        return;
-      }
+      if (!kueriPencarian) { await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian."); return; }
       await kirimPesanTelegram(chatId, "🌐 Sedang berselancar di internet via Tavily...");
       const hasilInternet = await cariDiInternet(kueriPencarian);
-
       await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Groq (Llama 3.3)...");
       const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Jawab secara terstruktur menggunakan poin-poin penting berdasarkan data internet berikut.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
-
       const resGroqSearch = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: instruksiRangkum }] })
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: instruksiRangkum }] })
       });
-      
       const dataSearch = await resGroqSearch.json();
-      const jawabanFinal = dataSearch.choices?.[0]?.message?.content || "⚠️ Gagal merangkum hasil penelusuran.";
-      await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Groq]:\n\n" + jawabanFinal);
+      await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Groq]:\n\n" + (dataSearch.choices?.[0]?.message?.content || "⚠️ Gagal"));
     }
       
     // [4] MODE GROQ CONVERSATIONAL
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
       await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
-      let riwayatChat = await getRedis(`memori_${chatId}`) || [];
-      riwayatChat.push({ role: "user", content: pertanyaanClean });
+      let riwayatChat = await getRedis(`memori_${chatId}`) || []; riwayatChat.push({ role: "user", content: pertanyaanClean });
       const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat.slice(-16) })});
-      const groqData = await resGroq.json();
-      const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses.";
-      if (!jawabanGroq.startsWith("⚠️")) {
-        riwayatChat.push({ role: "assistant", content: jawabanGroq });
-        await setRedis(`memori_${chatId}`, riwayatChat.slice(-16));
-      }
+      const groqData = await resGroq.json(); const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal.";
+      if (!jawabanGroq.startsWith("⚠️")) { riwayatChat.push({ role: "assistant", content: jawabanGroq }); await setRedis(`memori_${chatId}`, riwayatChat.slice(-16)); }
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
-    }
-
+  }
+                                                                                      
     // [5] MODE SUPER KILAT VIA LLAMA 4 SCOUT (GROQ)
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ Llama Scout (via Groq) sedang merangkai jawaban kilat...");
-      let riwayatSuper = await getRedis(`memori_super_${chatId}`) || [];
-      riwayatSuper.push({ role: "user", content: pertanyaanClean });
-
+      let riwayatSuper = await getRedis(`memori_super_${chatId}`) || []; riwayatSuper.push({ role: "user", content: pertanyaanClean });
       try {
-        const resSuper = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
-          body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", messages: riwayatSuper.slice(-16), temperature: 1.0, max_tokens: 1024, top_p: 1.0, stream: false })
-        });
-        
-        const dataSuper = await resSuper.json();
-        if (resSuper.ok) {
-          let jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Kosong.";
-          riwayatSuper.push({ role: "assistant", content: jawabanSuper });
-          await setRedis(`memori_super_${chatId}`, riwayatSuper.slice(-16));
-          await kirimPesanTelegram(chatId, `[Llama 4 Scout ⚡ Groq]:\n\n${jawabanSuper}`);
-        } else {
-          await kirimPesanTelegram(chatId, `⚠️ Error API Groq`);
-        }
-      } catch (err) {
-        await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan.");
-      }
+        const resSuper = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", messages: riwayatSuper.slice(-16) })});
+        const dataSuper = await resSuper.json(); if (resSuper.ok) { let jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Kosong."; riwayatSuper.push({ role: "assistant", content: jawabanSuper }); await setRedis(`memori_super_${chatId}`, riwayatSuper.slice(-16)); await kirimPesanTelegram(chatId, `[Llama 4 Scout ⚡ Groq]:\n\n${jawabanSuper}`); } else { await kirimPesanTelegram(chatId, `⚠️ Error API Groq`); }
+      } catch (err) { await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan."); }
     }
 
     // [6] MODE NVIDIA VISION
@@ -323,63 +300,33 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
       await kirimPesanTelegram(chatId, "⏳ NVIDIA sedang menganalisis pesan...");
       let riwayatNano = [];
-
       if (isImage && base64Image) {
-        let konten = [
-          { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
-          { type: "text", text: pertanyaanClean }
-        ];
-
+        let konten = [{ type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }, { type: "text", text: pertanyaanClean }];
         try {
-          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
-            body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: [{ role: "user", content: konten }], max_tokens: 700 })
-          });
-          
-          const data = await res.json();
-          const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
-          await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
-        } catch (err) {
-          await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan.");
-        }
-      } 
-      else {
-        riwayatNano = await getRedis(`memori_nano_${chatId}`) || [];
-        riwayatNano.push({ role: "user", content: pertanyaanClean });
-
+          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` }, body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: [{ role: "user", content: konten }], max_tokens: 700 })});
+          const data = await res.json(); await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${data.choices?.[0]?.message?.content || "⚠️ Respon kosong."}`);
+        } catch (err) { await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan."); }
+      } else {
+        riwayatNano = await getRedis(`memori_nano_${chatId}`) || []; riwayatNano.push({ role: "user", content: pertanyaanClean });
         try {
-          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
-            body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: riwayatNano, max_tokens: 700 })
-          });
-          
-          const data = await res.json();
-          const jawaban = data.choices?.[0]?.message?.content || "⚠️ Respon kosong.";
-          await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${jawaban}`);
-        } catch (err) {
-          await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan.");
-        }
+          const res = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` }, body: JSON.stringify({ model: "meta/llama-3.2-11b-vision-instruct", messages: riwayatNano, max_tokens: 700 })});
+          const data = await res.json(); await kirimPesanTelegram(chatId, `[NVIDIA Vision]:\n\n${data.choices?.[0]?.message?.content || "⚠️ Respon kosong."}`);
+        } catch (err) { await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan."); }
       }
     }
       
     // [7] MODE PENCARIAN GAMBAR PEXELS
     else if (aiPilihan === "gambar") {
-      const promptGambar = pesanUser.replace(/@gambar/gi, '').trim();
-      if (!promptGambar) return;
+      const promptGambar = pesanUser.replace(/@gambar/gi, '').trim(); if (!promptGambar) return;
       await kirimPesanTelegram(chatId, "⏳ Mencari foto...");
       const resPexels = await (await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(promptGambar)}&per_page=1`, { headers: { "Authorization": "Ak8w1HkWL0my455bsljopg04tq2JHkUkQH9SDmT5DDDhtp92GHEZuHTq" } })).json();
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-      // [8] MODE ANALISA TUGAS SEKOLAH - NATIVE API GEMINI (DUKUNG FOTO & PDF RUMUS ANTI-TABRAKAN)
+    // [8] MODE ANALISA TUGAS SEKOLAH - NATIVE API GEMINI DENGAN DUKUNGAN PDF MATEMATIKA
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
-      
-      if (!pertanyaanClean && !base64Image && !pdfBase64) {
-        await kirimPesanTelegram(chatId, "📝 *Saluran Analisa Tugas Active!*\nSilakan ketik tugas, kirim FOTO, atau lampirkan file PDF soalmu ke sini.");
-        return;
-      }
-      
+      if (!pertanyaanClean && !base64Image && !pdfBase64) { await kirimPesanTelegram(chatId, "📝 *Saluran Analisa Tugas Aktif!*\nSilakan ketik tugas, kirim FOTO, atau lampirkan file PDF soalmu ke sini."); return; }
       await kirimPesanTelegram(chatId, "⏳ Gemini 2.5 Flash sedang menganalisis soal/dokumen dan menyusun dokumen pembahasan...");
       
       const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA Senior yang sangat disiplin dan akurat. Tugasmu:
@@ -395,21 +342,14 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
       if (pdfBase64) isiKonten.push({ inline_data: { mime_type: "application/pdf", data: pdfBase64 } });
       
       const resGeminiTugas = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, { 
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ contents: [{ role: "user", parts: isiKonten }], generationConfig: { maxOutputTokens: 8192, temperature: 0.15, topP: 0.95 } })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ role: "user", parts: isiKonten }], generationConfig: { maxOutputTokens: 8192, temperature: 0.15, topP: 0.95 } })
       });
-      
-      const geminiData = await resGeminiTugas.json();
-      const hasilTugas = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+      const geminiData = await resGeminiTugas.json(); const hasilTugas = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (hasilTugas) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = pdfBase64 ? "Pembahasan_Soal_PDF.html" : (base64Image ? "Analisis_Soal_Lengkap.html" : "Tugas_Sekolah_Siap_Cetak.html");
-        
-        let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
-        markdownBersih = markdownBersih.replace(/\\\[/g, '$$$$').replace(/\\\]/g, '$$$$').replace(/\\\(/g, '$').replace(/\\\)/g, '$');
-        markdownBersih = markdownBersih.replace(/(\d+)\*(\d+)/g, '$1 x $2').replace(/(\d+)\^2/g, '$1²').replace(/(\d+)\^3/g, '$1³');         
-
+        let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/\\\[/g, '$$$$').replace(/\\\]/g, '$$$$').replace(/\\\(/g, '$').replace(/\\\)/g, '$').replace(/(\d+)\*(\d+)/g, '$1 x $2').replace(/(\d+)\^2/g, '$1²').replace(/(\d+)\^3/g, '$1³');         
         const amanUntukHtml = markdownBersih.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
         const desainHtmlUtuh = `
@@ -427,26 +367,13 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
                 startup: {
                   pageReady: () => {
                     let txt = document.getElementById('raw-markdown').value;
-                    let mathBlocks = [];
-                    let partsDD = txt.split("$$");
-                    for (let i = 1; i < partsDD.length; i += 2) {
-                      mathBlocks.push("$$" + partsDD[i] + "$$");
-                      partsDD[i] = "%%DISPLAYMATH_" + (mathBlocks.length - 1) + "%%";
-                    }
-                    txt = partsDD.join("");
-                    let partsD = txt.split("$");
-                    for (let i = 1; i < partsD.length; i += 2) {
-                      mathBlocks.push("$" + partsD[i] + "$");
-                      partsD[i] = "%%INLINEMATH_" + (mathBlocks.length - 1) + "%%";
-                    }
-                    txt = partsD.join("");
-                    let parsedHtml = marked.parse(txt);
-                    for (let i = 0; i < mathBlocks.length; i++) {
-                      parsedHtml = parsedHtml.replace("%%DISPLAYMATH_" + i + "%%", mathBlocks[i]);
-                      parsedHtml = parsedHtml.replace("%%INLINEMATH_" + i + "%%", mathBlocks[i]);
-                    }
-                    document.getElementById('content').innerHTML = parsedHtml;
-                    return MathJax.typesetPromise([document.getElementById('content')]);
+                    let mathBlocks = []; let partsDD = txt.split("$$");
+                    for (let i = 1; i < partsDD.length; i += 2) { mathBlocks.push("$$" + partsDD[i] + "$$"); partsDD[i] = "%%DISPLAYMATH_" + (mathBlocks.length - 1) + "%%"; }
+                    txt = partsDD.join(""); let partsD = txt.split("$");
+                    for (let i = 1; i < partsD.length; i += 2) { mathBlocks.push("$" + partsD[i] + "$"); partsD[i] = "%%INLINEMATH_" + (mathBlocks.length - 1) + "%%"; }
+                    txt = partsD.join(""); let parsedHtml = marked.parse(txt);
+                    for (let i = 0; i < mathBlocks.length; i++) { parsedHtml = parsedHtml.replace("%%DISPLAYMATH_" + i + "%%", mathBlocks[i]).replace("%%INLINEMATH_" + i + "%%", mathBlocks[i]); }
+                    document.getElementById('content').innerHTML = parsedHtml; return MathJax.typesetPromise([document.getElementById('content')]);
                   }
                 }
               };
@@ -456,29 +383,21 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
                 body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.8; padding: 40px 25px; color: #23272a; max-width: 820px; margin: 0 auto; font-size: 16px; background-color: #ffffff; }
                 h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 14px; margin-bottom: 35px; text-align: center; }
                 h3 { color: #34495e; margin-top: 35px; margin-bottom: 15px; border-left: 4px solid #3498db; padding-left: 12px; }
-                ul, ol { padding-left: 24px; margin-bottom: 20px; }
-                li { margin-bottom: 10px; text-align: justify; } 
-                p { margin-bottom: 20px; text-align: justify; } 
-                hr { border: 0; border-top: 1px solid #eaedf0; margin: 30px 0; }
-                .MathJax { font-size: 105%; color: #1a365d; }
-                mjx-container[display="true"] { margin: 25px 0 !important; padding: 8px 0; overflow-x: auto; overflow-y: hidden; }
+                ul, ol { padding-left: 24px; margin-bottom: 20px; } li { margin-bottom: 10px; text-align: justify; } p { margin-bottom: 20px; text-align: justify; } hr { border: 0; border-top: 1px solid #eaedf0; margin: 30px 0; }
+                .MathJax { font-size: 105%; color: #1a365d; } mjx-container[display="true"] { margin: 25px 0 !important; padding: 8px 0; overflow-x: auto; overflow-y: hidden; }
                 @media (max-width: 600px) { body { padding: 25px 16px; } h2 { font-size: 22px; } p, li { font-size: 15px; } }
             </style>
         </head>
         <body>
             <h2>📄 Kunci Jawaban & Pembahasan Lengkap</h2>
-            <textarea id="raw-markdown" style="display: none;">${amanPourHtml}</textarea>
+            <textarea id="raw-markdown" style="display: none;">\${amanPourHtml}</textarea>
             <div id="content"></div>
         </body>
         </html>
-        `.replace("${amanPourHtml}", amanUntukHtml);
-        
+        `.replace("\${amanPourHtml}", amanUntukHtml);
         await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil pembahasan matematika kurikulum SMA`);
-      } else {
-        const pesanError = geminiData.error?.message || JSON.stringify(geminiData);
-        await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Gemini:*\n\`${pesanError}\``);
-      }
-        }
+      } else { await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Gemini:*\n\`\${geminiData.error?.message || JSON.stringify(geminiData)}\``); }
+  }
 
       // [9] MODE ANALISA TUGAS UMUM & PDF VIA NATIVE GEMINI 2.5 FLASH
     else if (aiPilihan === "tugasumum") {
@@ -491,7 +410,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang membaca referensi dokumen dan menyusun jawaban tugas...");
       const instruksiUmum = `Kamu adalah Asisten Akademik, Guru Multidisiplin, dan Pakar Pendidikan Senior. 
 Tugasmu adalah menjawab pertanyaan atau menganalisis dokumen/gambar yang dikirimkan untuk materi non-matematika (seperti Sejarah, Biologi, Geografi, Bahasa, Sosiologi, dll).
-Berikan jawaban dalam bahasa Indonesia yang sangat rapi, gunakan format Markdown poin-poin (bullet points) agar mudah dipelajari, berwawasan luas, objektif, dan langsung menjawab inti tugas ilmiah tanpa basa-basi pembuka.`;
+Berikan jawaban dalam bahasa Indonesia yang sangat rapi, gunakan format Markdown poin-poin (bullet points) agar mudah dipelajari, berwawasan luas, objective, dan langsung menjawab inti tugas ilmiah tanpa basa-basi pembuka.`;
 
       let isiKonten = [{ text: `${instruksiUmum}\n\nPertanyaan/Perintah Tugas: ${pertanyaanClean || "Analisislah file referensi dokumen ini secara lengkap."}` }];
       if (base64Image) isiKonten.push({ inline_data: { mime_type: "image/jpeg", data: base64Image } });
@@ -514,4 +433,4 @@ Berikan jawaban dalam bahasa Indonesia yang sangat rapi, gunakan format Markdown
     console.error('Error in prosesLatarBelakang:', error);
   }
 }
-  
+
