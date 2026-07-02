@@ -35,8 +35,7 @@ async function getRedis(key) {
 async function cariDiInternet(query) {
   try {
     const response = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ api_key: TAVILY_API_KEY, query: query, max_results: 3, search_depth: "basic" })
     });
     const data = await response.json();
@@ -52,21 +51,18 @@ async function uploadCloudinaryKustom(imageBuffer, jenisPerbaikan) {
     formData.append('api_key', CLOUDINARY_API_KEY);
     formData.append('timestamp', Math.floor(Date.now() / 1000).toString());
     formData.append('upload_preset', 'ml_default');
-
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: formData });
     const data = await res.json();
     if (!res.ok) return null;
-
     const urlAsli = data.secure_url;
     let efek = "q_auto,f_auto"; 
     if (jenisPerbaikan.includes("semua kontras")) efek += ",e_improve,e_sharpen:40,e_auto_contrast"; 
     else if (jenisPerbaikan.includes("semua")) efek += ",e_improve,e_sharpen:40,e_auto_contrast,e_auto_color"; 
-    if (jenisPerbaikan.includes("bersih kontras")) efek += ",e_auto_contrast"; 
+    else if (jenisPerbaikan.includes("bersih kontras")) efek += ",e_auto_contrast"; 
     else if (jenisPerbaikan.includes("bersih")) efek += ",e_auto_contrast,e_auto_color"; 
     if (jenisPerbaikan.includes("terang")) efek += ",e_improve";
     if (jenisPerbaikan.includes("tajam")) efek += ",e_sharpen:60";
     if (jenisPerbaikan.includes("warna")) efek += ",e_auto_color";
-
     return urlAsli.replace("/upload/", `/upload/${efek}/`);
   } catch (err) { return null; }
 }
@@ -75,29 +71,23 @@ async function uploadCloudinaryKustom(imageBuffer, jenisPerbaikan) {
 async function kirimPesanTelegram(chatId, teks) {
   let teksBersih = teks.replace(/<think>[\s\S]*?<\/think>\n*/g, '').trim();
   if (!teksBersih) teksBersih = teks;
-
   let resMarkdown = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ chat_id: chatId, text: teksBersih, parse_mode: 'Markdown' }),
   });
   let dataMarkdown = await resMarkdown.json();
-
   if (!dataMarkdown.ok) {
     let htmlText = teksBersih.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>').replace(/`([^`]+)`/g, '<code>$1</code>');
     let resHtml = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: htmlText, parse_mode: 'HTML' }),
     });
     let dataHtml = await resHtml.json();
-    if (!dataHtml.ok) {
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: teksBersih }) });
-    }
+    if (!dataHtml.ok) await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: teksBersih }) });
   }
 }
 
 async function kirimFotoTelegramURL(chatId, urlFoto, caption) {
-  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: urlFoto, caption: caption, parse_mode: 'HTML' }),
-  });
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, photo: urlFoto, caption: caption, parse_mode: 'HTML' }) });
 }
 
 async function kirimDokumenHtmlTelegram(chatId, kontenHtml, namaFile, caption) {
@@ -111,7 +101,6 @@ async function kirimDokumenHtmlTelegram(chatId, kontenHtml, namaFile, caption) {
 // ================= MAIN HANDLER DENGAN BACKGROUND WORKER =================
 export default async function handler(request, context) {
   if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
-
   try {
     const data = await request.json();
     const updateId = data.update_id;
@@ -128,10 +117,9 @@ export default async function handler(request, context) {
     const fotoMasuk = messageData.photo;
     const dokumenMasuk = messageData.document;
 
-    if (!chatId || (pesanUser === "" && !fotoMasuk && !dokumenMasuk)) {
-      return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
-    }
+    if (!chatId || (pesanUser === "" && !fotoMasuk && !dokumenMasuk)) return new Response(JSON.stringify({ status: 'ignored' }), { status: 200 });
     
+    // 🔥 STRING BACKTICK DIPERBAIKI
     if (pesanLowercase === "/start") {
       await setRedis(`sesi_${chatId}`, ""); 
       const teksSambut = `✨ *Selamat Datang di Multiple AI Response Bot!* ✨\n` +
@@ -146,7 +134,6 @@ export default async function handler(request, context) {
                          `📝 *@analisatugas [soal/foto/pdf]* -> Asisten cerdas matematika & bedah soal PDF\n` +
                          `📚 *@tugasumum [teks/foto/pdf]* -> Jawab tugas non-matematika & bedah file PDF\n\n` +
                          `*Contoh:* \`@search berita bola hari ini\` atau tinggal kirim foto dengan caption \`@analisatugas kerjakan\``;
-                         
       await kirimPesanTelegram(chatId, teksSambut);
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
@@ -169,7 +156,6 @@ export default async function handler(request, context) {
 
     context.waitUntil(prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase, fotoMasuk, dokumenMasuk));
     return new Response(JSON.stringify({ status: 'queued_in_background' }), { status: 200 });
-
   } catch (error) {
     console.error('Main handler error:', error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 500 });
@@ -193,8 +179,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (dokumenMasuk.mime_type === 'application/pdf') {
         fileIdToDownload = dokumenMasuk.file_id;
         isPdf = true;
-      } 
-      else if (dokumenMasuk.mime_type && dokumenMasuk.mime_type.startsWith('image/')) {
+      } else if (dokumenMasuk.mime_type && dokumenMasuk.mime_type.startsWith('image/')) {
         fileIdToDownload = dokumenMasuk.file_id;
         isImage = true;
       }
@@ -203,32 +188,13 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
     let imageBuffer = null;
     let base64Image = null;
     
-    // 🔥 FIX: Jalur download dibuka agar bisa mengunduh file gambar DAN pdf sekaligus
+    // 🔥 GERBANG UNDUHAN PDF & GAMBAR DIBUKA
     if ((isImage || isPdf) && fileIdToDownload) {
       const resFile = await (await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${fileIdToDownload}`)).json();
       if (resFile.ok) {
         const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
         const resStream = await fetch(fileUrl);
         imageBuffer = await resStream.arrayBuffer();
-        
-        // 🔥 FIX: Distribusi data base64 gambar dan pdf agar dibaca lancar oleh Gemini
-        if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "analisatugas" || aiPilihan === "tugasumum") {
-          if (isImage) base64Image = Buffer.from(imageBuffer).toString('base64');
-          if (isPdf) pdfBase64 = Buffer.from(imageBuffer).toString('base64');
-        }
-      }
-}
-    
-    let imageBuffer = null;
-    let base64Image = null;
-    
-    if ((isImage || isPdf) && fileIdToDownload) {
-      const resFile = await (await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/getFile?file_id=${fileIdToDownload}`)).json();
-      if (resFile.ok) {
-        const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_TOKEN}/${resFile.result.file_path}`;
-        const resStream = await fetch(fileUrl);
-        imageBuffer = await resStream.arrayBuffer();
-        
         if (aiPilihan === "gemini" || aiPilihan === "nano" || aiPilihan === "analisatugas" || aiPilihan === "tugasumum") {
           if (isImage) base64Image = Buffer.from(imageBuffer).toString('base64');
           if (isPdf) pdfBase64 = Buffer.from(imageBuffer).toString('base64');
@@ -238,45 +204,29 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
     
     // [1] MODE EDIT GAMBAR VIA CLOUDINARY
     if (aiPilihan === "edit") {
-      if (!isImage || !imageBuffer) {
-        await kirimPesanTelegram(chatId, "📸 *Sesi AI Perbaikan Foto Aktif!*\nKirimkan fotomu lalu tambahkan salah satu kata kunci ini di caption:\n\n👉 *terang*, *tajam*, *warna*, *bersih*, *bersih kontras*, *semua*, atau *semua kontras*");
-        return;
-      }
+      if (!isImage || !imageBuffer) { await kirimPesanTelegram(chatId, "📸 *Sesi AI Perbaikan Foto Aktif!*\nKirimkan fotomu lalu tambahkan salah satu kata kunci ini di caption:\n\n👉 *terang*, *tajam*, *warna*, *bersih*, *bersih kontras*, *semua*, atau *semua kontras*"); return; }
       await kirimPesanTelegram(chatId, "🪄 AI sedang mengolah fotomu dengan racikan kustom...");
       const linkHasil = await uploadCloudinaryKustom(imageBuffer, pesanLowercase);
       if (linkHasil) await kirimFotoTelegramURL(chatId, linkHasil, "✨ Hasil perbaikan foto kamu sudah siap!");
       else await kirimPesanTelegram(chatId, "❌ Gagal memproses gambar di Cloudinary.");
     }
-      
     // [2] MODE GEMINI MULTIMODAL
     else if (aiPilihan === "gemini") {
       let pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis.";
       pertanyaanClean += " (Berikan jawaban yang singkat, padat, langsung ke inti langkah pengerjaan/rumusnya saja).";
-      
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
       let memoriMentah = [];
-      if (base64Image) { await setRedis(`memori_gemini_${chatId}`, []); memoriMentah = []; }
-      else { memoriMentah = await getRedis(`memori_gemini_${chatId}`) || []; }
-
+      if (base64Image) { await setRedis(`memori_gemini_${chatId}`, []); memoriMentah = []; } else { memoriMentah = await getRedis(`memori_gemini_${chatId}`) || []; }
       let formatGemini = memoriMentah.map(msg => ({ role: msg.role, parts: [{ text: msg.content }] }));
       let partsSaatIni = [{ text: pertanyaanClean }];
       if (base64Image) partsSaatIni.push({ "inline_data": { "mime_type": "image/jpeg", "data": base64Image } });
       formatGemini.push({ role: "user", parts: partsSaatIni });
-      
-      const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini })
-      });
+      const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini }) });
       const resData = await resGemini.json();
       let jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Respon tidak dikenali.";
-
-      if (!jawaban.startsWith("⚠️")) {
-          memoriMentah.push({ role: "user", content: pertanyaanClean });
-          memoriMentah.push({ role: "model", content: jawaban });
-          await setRedis(`memori_gemini_${chatId}`, memoriMentah.slice(-6));
-      }
+      if (!jawaban.startsWith("⚠️")) { memoriMentah.push({ role: "user", content: pertanyaanClean }); memoriMentah.push({ role: "model", content: jawaban }); await setRedis(`memori_gemini_${chatId}`, memoriMentah.slice(-6)); }
       await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
     }
-
     // [3] MODE PERPLEXITY (BROWSING + GROQ)
     else if (aiPilihan === "search") {
       const kueriPencarian = pesanUser.replace(/@search|\/search/gi, '').trim();
@@ -284,36 +234,31 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       await kirimPesanTelegram(chatId, "🌐 Sedang berselancar di internet via Tavily...");
       const hasilInternet = await cariDiInternet(kueriPencarian);
       await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Groq (Llama 3.3)...");
-      const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Jawab secara terstruktur menggunakan poin-poin penting berdasarkan data internet berikut.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
-      const resGroqSearch = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: instruksiRangkum }] })
-      });
+      const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Jawab secara terstruktur menggunakan poin-poin penting berdasarkan data internet berikut. Tambahkan '📌 Sumber Referensi:' di bagian paling bawah.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
+      const resGroqSearch = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: [{ role: "user", content: instruksiRangkum }] }) });
       const dataSearch = await resGroqSearch.json();
-      await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Groq]:\n\n" + (dataSearch.choices?.[0]?.message?.content || "⚠️ Gagal"));
+      await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Groq]:\n\n" + (dataSearch.choices?.[0]?.message?.content || "⚠️ Gagal merangkum hasil."));
     }
-      
     // [4] MODE GROQ CONVERSATIONAL
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
       await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
       let riwayatChat = await getRedis(`memori_${chatId}`) || []; riwayatChat.push({ role: "user", content: pertanyaanClean });
       const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat.slice(-16) })});
-      const groqData = await resGroq.json(); const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal.";
+      const groqData = await resGroq.json(); const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses.";
       if (!jawabanGroq.startsWith("⚠️")) { riwayatChat.push({ role: "assistant", content: jawabanGroq }); await setRedis(`memori_${chatId}`, riwayatChat.slice(-16)); }
       await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
-  }
-                                                                                      
+    }
     // [5] MODE SUPER KILAT VIA LLAMA 4 SCOUT (GROQ)
     else if (aiPilihan === "super") {
       const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ Llama Scout (via Groq) sedang merangkai jawaban kilat...");
+      await kirimPesanTelegram(chatId, "⏳ Llama Scout sedang merangkai jawaban kilat...");
       let riwayatSuper = await getRedis(`memori_super_${chatId}`) || []; riwayatSuper.push({ role: "user", content: pertanyaanClean });
       try {
         const resSuper = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", messages: riwayatSuper.slice(-16) })});
         const dataSuper = await resSuper.json(); if (resSuper.ok) { let jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Kosong."; riwayatSuper.push({ role: "assistant", content: jawabanSuper }); await setRedis(`memori_super_${chatId}`, riwayatSuper.slice(-16)); await kirimPesanTelegram(chatId, `[Llama 4 Scout ⚡ Groq]:\n\n${jawabanSuper}`); } else { await kirimPesanTelegram(chatId, `⚠️ Error API Groq`); }
       } catch (err) { await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan."); }
     }
-
     // [6] MODE NVIDIA VISION
     else if (aiPilihan === "nano") {
       const pertanyaanClean = pesanUser.replace(/@nano/gi, '').trim() || "Jelaskan gambar ini.";
@@ -333,7 +278,6 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
         } catch (err) { await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan."); }
       }
     }
-      
     // [7] MODE PENCARIAN GAMBAR PEXELS
     else if (aiPilihan === "gambar") {
       const promptGambar = pesanUser.replace(/@gambar/gi, '').trim(); if (!promptGambar) return;
@@ -342,12 +286,16 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (resPexels.photos?.length > 0) await kirimFotoTelegramURL(chatId, resPexels.photos[0].src.large, `📸 Hasil: <b>${promptGambar}</b>`);
     }
 
-    // [8] MODE ANALISA TUGAS SEKOLAH - NATIVE API GEMINI DENGAN DUKUNGAN PDF MATEMATIKA
+      // [8] MODE ANALISA TUGAS SEKOLAH - NATIVE API GEMINI (DUKUNG PDF & FOTO)
     else if (aiPilihan === "analisatugas") {
       const pertanyaanClean = pesanUser.replace(/@analisatugas/gi, '').trim();
-      if (!pertanyaanClean && !base64Image && !pdfBase64) { await kirimPesanTelegram(chatId, "📝 *Saluran Analisa Tugas Aktif!*\nSilakan ketik tugas, kirim FOTO, atau lampirkan file PDF soalmu ke sini."); return; }
-      await kirimPesanTelegram(chatId, "⏳ Gemini 2.5 Flash sedang menganalisis soal/dokumen dan menyusun dokumen pembahasan...");
       
+      if (!pertanyaanClean && !base64Image && !pdfBase64) {
+        await kirimPesanTelegram(chatId, "📝 *Saluran Analisa Tugas Aktif!*\nSilakan ketik tugas/soal atau langsung kirim FOTO/PDF soalmu ke sini.");
+        return;
+      }
+      
+      await kirimPesanTelegram(chatId, "⏳ Gemini 2.5 Flash sedang menganalisis soal dan menyusun dokumen pembahasan...");
       const instruksiPakar = `Kamu adalah Guru Matematika/Sains SMA Senior yang sangat disiplin dan akurat. Tugasmu:
 1. Selesaikan soal pada gambar secara ilmiah, logis, dan runut sesuai dengan standar Kurikulum Nasional SMA.
 2. WAJIB menuliskan RUMUS BAKU (General Formula) yang bersumber dari buku cetak resmi terlebih dahulu di awal pembahasan sebelum memasukkan angka. lalu teruskan pengerjaan rumus atau persamaan matematika tersebut selangkah demi selangkah hingga selesai sempurna
@@ -356,7 +304,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
 5. Berikan pembahasan yang bersih dan mudah dipahami, langsung ke perhitungan inti, dan tuliskan kesimpulan jawaban akhir secara ringkas tepat satu kali di bagian paling bawah. JANGAN mengulang seluruh teks pembahasan atau membuat soal baru agar dokumen tetap rapi.
 Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/matriks/display dengan $$...$$.`;
       
-      let isiKonten = [{ text: `${instruksiPakar}\n\nPerintah Tambahan: ${pertanyaanClean || "Selesaikan seluruh soal pada file referensi ini secara urut menggunakan rumus resmi."}` }];
+      let isiKonten = [{ text: `${instruksiPakar}\n\nPerintah Tambahan: ${pertanyaanClean || "Selesaikan seluruh soal pada referensi ini secara urut menggunakan rumus resmi."}` }];
       if (base64Image) isiKonten.push({ inline_data: { mime_type: "image/jpeg", data: base64Image } });
       if (pdfBase64) isiKonten.push({ inline_data: { mime_type: "application/pdf", data: pdfBase64 } });
       
@@ -368,6 +316,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
       if (hasilTugas) {
         await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
         const namaFileHasil = pdfBase64 ? "Pembahasan_Soal_PDF.html" : (base64Image ? "Analisis_Soal_Lengkap.html" : "Tugas_Sekolah_Siap_Cetak.html");
+        
         let markdownBersih = hasilTugas.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/\\\[/g, '$$$$').replace(/\\\]/g, '$$$$').replace(/\\\(/g, '$').replace(/\\\)/g, '$').replace(/(\d+)\*(\d+)/g, '$1 x $2').replace(/(\d+)\^2/g, '$1²').replace(/(\d+)\^3/g, '$1³');         
         const amanUntukHtml = markdownBersih.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -385,8 +334,7 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
                 tex: { inlineMath: [['$', '$']], displayMath: [['$$', '$$']] },
                 startup: {
                   pageReady: () => {
-                    let txt = document.getElementById('raw-markdown').value;
-                    let mathBlocks = []; let partsDD = txt.split("$$");
+                    let txt = document.getElementById('raw-markdown').value; let mathBlocks = []; let partsDD = txt.split("$$");
                     for (let i = 1; i < partsDD.length; i += 2) { mathBlocks.push("$$" + partsDD[i] + "$$"); partsDD[i] = "%%DISPLAYMATH_" + (mathBlocks.length - 1) + "%%"; }
                     txt = partsDD.join(""); let partsD = txt.split("$");
                     for (let i = 1; i < partsD.length; i += 2) { mathBlocks.push("$" + partsD[i] + "$"); partsD[i] = "%%INLINEMATH_" + (mathBlocks.length - 1) + "%%"; }
@@ -409,27 +357,30 @@ Format Rumus: Wajib bungkus rumus pendek/inline dengan $...$ dan rumus panjang/m
         </head>
         <body>
             <h2>📄 Kunci Jawaban & Pembahasan Lengkap</h2>
-            <textarea id="raw-markdown" style="display: none;">\${amanPourHtml}</textarea>
+            <textarea id="raw-markdown" style="display: none;">\${amanUntukHtml}</textarea>
             <div id="content"></div>
         </body>
         </html>
-        `.replace("\${amanPourHtml}", amanUntukHtml);
+        `.replace("\${amanUntukHtml}", amanUntukHtml);
+
         await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📄 Hasil pembahasan matematika kurikulum SMA`);
       } else { await kirimPesanTelegram(chatId, `❌ Gagal memproses!\n\n*Pesan Error Gemini:*\n\`\${geminiData.error?.message || JSON.stringify(geminiData)}\``); }
-  }
+    }
 
-      // [9] MODE ANALISA TUGAS UMUM & PDF VIA NATIVE GEMINI 2.5 FLASH
+    // [9] MODE ANALISA TUGAS UMUM & PDF VIA NATIVE GEMINI 2.5 FLASH
     else if (aiPilihan === "tugasumum") {
       const pertanyaanClean = pesanUser.replace(/@tugasumum/gi, '').trim();
+      
       if (!pertanyaanClean && !base64Image && !pdfBase64) {
         await kirimPesanTelegram(chatId, "📚 *Saluran Tugas Umum Aktif!*\nSilakan ketik pertanyaan, kirim foto soal, atau langsung lampirkan file dokumen PDF tugasmu ke sini.");
         return;
       }
       
       await kirimPesanTelegram(chatId, "⏳ Gemini sedang membaca referensi dokumen dan menyusun jawaban tugas...");
+      
       const instruksiUmum = `Kamu adalah Asisten Akademik, Guru Multidisiplin, dan Pakar Pendidikan Senior. 
 Tugasmu adalah menjawab pertanyaan atau menganalisis dokumen/gambar yang dikirimkan untuk materi non-matematika (seperti Sejarah, Biologi, Geografi, Bahasa, Sosiologi, dll).
-Berikan jawaban dalam bahasa Indonesia yang sangat rapi, gunakan format Markdown poin-poin (bullet points) agar mudah dipelajari, berwawasan luas, objective, dan langsung menjawab inti tugas ilmiah tanpa basa-basi pembuka.`;
+Berikan jawaban dalam bahasa Indonesia yang sangat rapi, gunakan format Markdown poin-poin (bullet points) agar mudah dipelajari, berwawasan luas, objektif, dan langsung menjawab inti tugas ilmiah tanpa basa-basi pembuka.`;
 
       let isiKonten = [{ text: `${instruksiUmum}\n\nPertanyaan/Perintah Tugas: ${pertanyaanClean || "Analisislah file referensi dokumen ini secara lengkap."}` }];
       if (base64Image) isiKonten.push({ inline_data: { mime_type: "image/jpeg", data: base64Image } });
@@ -447,9 +398,9 @@ Berikan jawaban dalam bahasa Indonesia yang sangat rapi, gunakan format Markdown
         await kirimPesanTelegram(chatId, `❌ Gagal memproses dokumen tugas. Google API merespon: ${JSON.stringify(resData).substring(0, 150)}`);
       }
     }
-
+  
+  // 🔥 INI ADALAH CATCH PENYELAMAT YANG SEBELUMNYA HILANG
   } catch (error) {
     console.error('Error in prosesLatarBelakang:', error);
   }
 }
-
