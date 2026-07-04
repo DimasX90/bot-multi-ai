@@ -5,7 +5,6 @@ export const config = {
 // ==================== CONFIGURATION ====================
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY; 
 const TAVILY_API_KEY = process.env.TAVILY_API_KEY; 
@@ -232,56 +231,53 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
     else if (aiPilihan === "search") {
       const kueriPencarian = pesanUser.replace(/@search|\/search/gi, '').trim();
       if (!kueriPencarian) { await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian."); return; }
+      
       await kirimPesanTelegram(chatId, "🌐 Sedang berselancar di internet via Tavily...");
       const hasilInternet = await cariDiInternet(kueriPencarian);
-      await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Llama 3.3...");
       
+      await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Gemini untuk dirangkum...");
       const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Jawab secara terstruktur menggunakan poin-poin penting berdasarkan data internet berikut. Tambahkan '📌 Sumber Referensi:' di bagian paling bawah.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
       
-      const resSearch = await fetch("https://openrouter.ai/api/v1/chat/completions", { 
+      const resGeminiSearch = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST', 
-        headers: { 
-          'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'https://t.me',
-          'X-Title': 'Telegram Bot'
-        }, 
+        headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ 
-          model: "meta-llama/llama-3.3-70b-instruct:free", 
-          messages: [{ role: "user", content: instruksiRangkum }] 
-        }) 
+          contents: [{ role: "user", parts: [{ text: instruksiRangkum }] }] 
+        })
       });
-      const dataSearch = await resSearch.json();
-      await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Llama 3.3]:\n\n" + (dataSearch.choices?.[0]?.message?.content || "⚠️ Gagal merangkum hasil."));
+      
+      const dataSearch = await resGeminiSearch.json();
+      const hasilRangkuman = dataSearch.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Gagal merangkum hasil penelusuran.";
+      
+      await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Gemini]:\n\n" + hasilRangkuman);
     }
     // [4] MODE OPENROUTER CONVERSATIONAL
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
-      await kirimPesanTelegram(chatId, "⏳ Llama 3.3 sedang memproses jawaban...");
+      await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
       let riwayatChat = await getRedis(`memori_${chatId}`) || []; 
       riwayatChat.push({ role: "user", content: pertanyaanClean });
       
-      const resChat = await fetch("https://openrouter.ai/api/v1/chat/completions", { 
+      const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
         method: 'POST', 
         headers: { 
           'Content-Type': 'application/json', 
-          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'https://t.me',
-          'X-Title': 'Telegram Bot'
+          'Authorization': `Bearer ${GROQ_API_KEY}` 
         }, 
         body: JSON.stringify({ 
-          model: "meta-llama/llama-3.3-70b-instruct:free", 
+          model: "llama-3.3-70b-versatile", 
           messages: riwayatChat.slice(-16) 
         })
       });
-      const chatData = await resChat.json(); 
-      const jawabanChat = chatData.choices?.[0]?.message?.content || "⚠️ Gagal memproses.";
       
-      if (!jawabanChat.startsWith("⚠️")) { 
-        riwayatChat.push({ role: "assistant", content: jawabanChat }); 
+      const groqData = await resGroq.json(); 
+      const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses.";
+      
+      if (!jawabanGroq.startsWith("⚠️")) { 
+        riwayatChat.push({ role: "assistant", content: jawabanGroq }); 
         await setRedis(`memori_${chatId}`, riwayatChat.slice(-16)); 
       }
-      await kirimPesanTelegram(chatId, `[Llama 3.3 🚀]:\n\n${jawabanChat}`);
+      await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
     // [5] MODE SUPER KILAT VIA LLAMA 4 SCOUT (GROQ)
     else if (aiPilihan === "super") {
