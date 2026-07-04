@@ -234,21 +234,54 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       if (!kueriPencarian) { await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian."); return; }
       await kirimPesanTelegram(chatId, "🌐 Sedang berselancar di internet via Tavily...");
       const hasilInternet = await cariDiInternet(kueriPencarian);
-      await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Groq (Llama 3.3)...");
+      await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Llama 3.3...");
+      
       const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Jawab secara terstruktur menggunakan poin-poin penting berdasarkan data internet berikut. Tambahkan '📌 Sumber Referensi:' di bagian paling bawah.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
-      const resGroqSearch = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY }, body: JSON.stringify({ model: "openai/gpt-oss-120b", messages: [{ role: "user", content: instruksiRangkum }] }) });
-      const dataSearch = await resGroqSearch.json();
-      await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Groq]:\n\n" + (dataSearch.choices?.[0]?.message?.content || "⚠️ Gagal merangkum hasil."));
+      
+      const resSearch = await fetch("https://openrouter.ai/api/v1/chat/completions", { 
+        method: 'POST', 
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': 'https://t.me',
+          'X-Title': 'Telegram Bot'
+        }, 
+        body: JSON.stringify({ 
+          model: "meta-llama/llama-3.3-70b-instruct:free", 
+          messages: [{ role: "user", content: instruksiRangkum }] 
+        }) 
+      });
+      const dataSearch = await resSearch.json();
+      await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Llama 3.3]:\n\n" + (dataSearch.choices?.[0]?.message?.content || "⚠️ Gagal merangkum hasil."));
     }
-    // [4] MODE GROQ CONVERSATIONAL
+    // [4] MODE OPENROUTER CONVERSATIONAL
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
-      await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
-      let riwayatChat = await getRedis(`memori_${chatId}`) || []; riwayatChat.push({ role: "user", content: pertanyaanClean });
-      const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "openai/gpt-oss-120b", messages: riwayatChat.slice(-16) })});
-      const groqData = await resGroq.json(); const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses.";
-      if (!jawabanGroq.startsWith("⚠️")) { riwayatChat.push({ role: "assistant", content: jawabanGroq }); await setRedis(`memori_${chatId}`, riwayatChat.slice(-16)); }
-      await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
+      await kirimPesanTelegram(chatId, "⏳ Llama 3.3 sedang memproses jawaban...");
+      let riwayatChat = await getRedis(`memori_${chatId}`) || []; 
+      riwayatChat.push({ role: "user", content: pertanyaanClean });
+      
+      const resChat = await fetch("https://openrouter.ai/api/v1/chat/completions", { 
+        method: 'POST', 
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': 'https://t.me',
+          'X-Title': 'Telegram Bot'
+        }, 
+        body: JSON.stringify({ 
+          model: "meta-llama/llama-3.3-70b-instruct:free", 
+          messages: riwayatChat.slice(-16) 
+        })
+      });
+      const chatData = await resChat.json(); 
+      const jawabanChat = chatData.choices?.[0]?.message?.content || "⚠️ Gagal memproses.";
+      
+      if (!jawabanChat.startsWith("⚠️")) { 
+        riwayatChat.push({ role: "assistant", content: jawabanChat }); 
+        await setRedis(`memori_${chatId}`, riwayatChat.slice(-16)); 
+      }
+      await kirimPesanTelegram(chatId, `[Llama 3.3 🚀]:\n\n${jawabanChat}`);
     }
     // [5] MODE SUPER KILAT VIA LLAMA 4 SCOUT (GROQ)
     else if (aiPilihan === "super") {
