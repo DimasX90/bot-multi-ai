@@ -422,8 +422,42 @@ Berikan jawaban dalam bahasa Indonesia yang sangat rapi, gunakan format Markdown
       const resData = await resGemini.json();
       const jawabanTugas = resData.candidates?.[0]?.content?.parts?.[0]?.text;
       
+      // 🔥 BAGIAN INI SUDAH DIUBAH MENJADI PENCETAK FILE
       if (jawabanTugas) {
-        await kirimPesanTelegram(chatId, `📖 *Hasil Pembahasan Tugas Kustom*:\n\n${jawabanTugas}`);
+        await kirimPesanTelegram(chatId, "✅ Analisis selesai! Sedang mencetak dokumen...");
+        const namaFileHasil = pdfBase64 ? "Pembahasan_Tugas_PDF.html" : (base64Image ? "Analisis_Tugas_Gambar.html" : "Tugas_Umum_Siap_Cetak.html");
+        
+        let markdownBersih = jawabanTugas.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        const amanUntukHtml = markdownBersih.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        const desainHtmlUtuh = `
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+            <title>Pembahasan Tugas Umum</title>
+            <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+            <style>
+                body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.8; padding: 40px 25px; color: #23272a; max-width: 820px; margin: 0 auto; font-size: 16px; background-color: #ffffff; }
+                h2 { color: #2c3e50; border-bottom: 2px solid #27ae60; padding-bottom: 14px; margin-bottom: 35px; text-align: center; }
+                h3 { color: #34495e; margin-top: 35px; margin-bottom: 15px; border-left: 4px solid #27ae60; padding-left: 12px; }
+                ul, ol { padding-left: 24px; margin-bottom: 20px; } li { margin-bottom: 10px; text-align: justify; } p { margin-bottom: 20px; text-align: justify; } hr { border: 0; border-top: 1px solid #eaedf0; margin: 30px 0; }
+                @media (max-width: 600px) { body { padding: 25px 16px; } h2 { font-size: 22px; } p, li { font-size: 15px; } }
+            </style>
+        </head>
+        <body>
+            <h2>📖 Kunci Jawaban & Pembahasan Tugas Umum</h2>
+            <textarea id="raw-markdown" style="display: none;">${amanUntukHtml}</textarea>
+            <div id="content"></div>
+            <script>
+                document.getElementById('content').innerHTML = marked.parse(document.getElementById('raw-markdown').value);
+            </script>
+        </body>
+        </html>
+        `;
+
+        await kirimDokumenHtmlTelegram(chatId, desainHtmlUtuh, namaFileHasil, `📖 Hasil pembahasan tugas umum`);
       } else {
         await kirimPesanTelegram(chatId, `❌ Gagal memproses dokumen tugas. Google API merespon: ${JSON.stringify(resData).substring(0, 150)}`);
       }
