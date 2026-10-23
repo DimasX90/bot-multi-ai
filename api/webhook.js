@@ -275,25 +275,38 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
     }
     // [4] MODE GROQ
     else if (aiPilihan === "groq") {
-      const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim();
+      const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
       let riwayatChat = await getRedis(`memori_${chatId}`) || []; 
       riwayatChat.push({ role: "user", content: pertanyaanClean });
       
-      const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, 
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: riwayatChat.slice(-16) })
-      });
-      
-      const groqData = await resGroq.json(); 
-      const jawabanGroq = groqData.choices?.[0]?.message?.content || "⚠️ Gagal memproses.";
-      
-      if (!jawabanGroq.startsWith("⚠️")) { 
-        riwayatChat.push({ role: "assistant", content: jawabanGroq }); 
-        await setRedis(`memori_${chatId}`, riwayatChat.slice(-16)); 
+      try {
+        const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
+          method: 'POST', 
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${GROQ_API_KEY}` 
+          }, 
+          body: JSON.stringify({ 
+            model: "llama-3.3-70b-versatile", 
+            messages: riwayatChat.slice(-16) 
+          })
+        });
+        
+        const groqData = await resGroq.json(); 
+        const jawabanGroq = groqData.choices?.[0]?.message?.content;
+        
+        if (jawabanGroq) { 
+          riwayatChat.push({ role: "assistant", content: jawabanGroq }); 
+          await setRedis(`memori_${chatId}`, riwayatChat.slice(-16)); 
+          await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
+        } else {
+          const pesanErr = groqData.error?.message || "GROQ_API_KEY belum terpasang atau salah.";
+          await kirimPesanTelegram(chatId, `⚠️ Groq Gagal:\n\n${pesanErr}`);
+        }
+      } catch (err) {
+        await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan koneksi ke Groq.");
       }
-      await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
     }
     // [5] MODE SUPER (GROQ LLAMA 4 SCOUT)
     else if (aiPilihan === "super") {
