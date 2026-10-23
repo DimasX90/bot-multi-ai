@@ -45,10 +45,9 @@ async function getRedis(key) {
 // 🔥 FUNGSI BANTUAN INTERNET (DOKUMEN RESMI) & CLOUDINARY
 async function cariDiInternet(query) {
   try {
-    const kueriSpesifik = `${query} filetype:pdf OR site:go.id`;
     const response = await fetch("https://api.tavily.com/search", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: TAVILY_API_KEY, query: kueriSpesifik, max_results: 3, search_depth: "basic" })
+      body: JSON.stringify({ api_key: TAVILY_API_KEY, query: query, max_results: 3, search_depth: "basic" })
     });
     const data = await response.json();
     if (!data.results || data.results.length === 0) return "Tidak ditemukan informasi relevan di internet.";
