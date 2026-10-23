@@ -230,7 +230,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       let partsSaatIni = [{ text: pertanyaanClean }];
       if (base64Image) partsSaatIni.push({ "inline_data": { "mime_type": "image/jpeg", "data": base64Image } });
       formatGemini.push({ role: "user", parts: partsSaatIni });
-      const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini }) });
+      const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini }) });
       const resData = await resGemini.json();
       let jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Respon tidak dikenali.";
       if (!jawaban.startsWith("⚠️")) { memoriMentah.push({ role: "user", content: pertanyaanClean }); memoriMentah.push({ role: "model", content: jawaban }); await setRedis(`memori_gemini_${chatId}`, memoriMentah.slice(-6)); }
@@ -251,7 +251,7 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Jawab pertanyaan berikut secara terstruktur, objektif, dan ringkas menggunakan data internet yang disediakan. Di bagian paling bawah, tuliskan '📌 Sumber Referensi:' lalu daftarkan sumber link yang ada.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
       
       try {
-        const resGeminiSearch = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY, {
+        const resGeminiSearch = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + GEMINI_API_KEY, {
           method: 'POST', 
           headers: { 'Content-Type': 'application/json' }, 
           body: JSON.stringify({ 
