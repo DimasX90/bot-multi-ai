@@ -18,10 +18,15 @@ const UPSTASH_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 async function setRedis(key, value) {
   try {
     if (!UPSTASH_REST_URL || !UPSTASH_REST_TOKEN) return;
-    await fetch(`${UPSTASH_REST_URL}/set/${key}`, {
+    const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+    
+    await fetch(`${UPSTASH_REST_URL}/set/${encodeURIComponent(key)}`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${UPSTASH_REST_TOKEN}` },
-      body: JSON.stringify(value),
+      headers: { 
+        'Authorization': `Bearer ${UPSTASH_REST_TOKEN}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(stringValue)
     });
   } catch (e) {
     console.error("Redis Set Error:", e);
@@ -31,17 +36,24 @@ async function setRedis(key, value) {
 async function getRedis(key) {
   try {
     if (!UPSTASH_REST_URL || !UPSTASH_REST_TOKEN) return null;
-    const res = await fetch(`${UPSTASH_REST_URL}/get/${key}`, {
-      headers: { Authorization: `Bearer ${UPSTASH_REST_TOKEN}` },
+    const res = await fetch(`${UPSTASH_REST_URL}/get/${encodeURIComponent(key)}`, {
+      headers: { 'Authorization': `Bearer ${UPSTASH_REST_TOKEN}` }
     });
+    
+    if (!res.ok) return null;
     const data = await res.json();
-    return data.result ? JSON.parse(data.result) : null;
+    if (!data.result) return null;
+
+    try {
+      return JSON.parse(data.result);
+    } catch {
+      return data.result; // Jika berupa string murni seperti "groq"
+    }
   } catch (e) {
     console.error("Redis Get Error:", e);
     return null;
   }
 }
-
 // 🔥 FUNGSI BANTUAN INTERNET & CLOUDINARY
 async function cariDiInternet(query) {
   try {
@@ -149,33 +161,35 @@ export default async function handler(request, context) {
     }
 
     // 🔥 LOGIKA PENGGANTIAN SALURAN OTOMATIS
-    let aiPilihan = await getRedis(`sesi_${chatId}`);
+    let aiPilihanLama = await getRedis(`sesi_${chatId}`);
+    let aiPilihanBaru = null;
 
-    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) aiPilihan = "search";
-    else if (pesanLowercase.includes("@gemini") || (fotoMasuk && pesanUser === "" && aiPilihan !== "edit")) aiPilihan = "gemini";
-    else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) aiPilihan = "groq";
-    else if (pesanLowercase.includes("@super")) aiPilihan = "super";
-    else if (pesanLowercase.includes("@nano")) aiPilihan = "nano";
-    else if (pesanLowercase.includes("@gambar")) aiPilihan = "gambar";
-    else if (pesanLowercase.includes("@edit")) aiPilihan = "edit";
-    else if (pesanLowercase.includes("@analisatugas")) aiPilihan = "analisatugas";
-    else if (pesanLowercase.includes("@tugasumum")) aiPilihan = "tugasumum";
+    // 1. Cek apakah ada panggil tag @ baru di pesan user
+    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) aiPilihanBaru = "search";
+    else if (pesanLowercase.includes("@gemini") || (fotoMasuk && pesanUser === "" && aiPilihanLama !== "edit")) aiPilihanBaru = "gemini";
+    else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) aiPilihanBaru = "groq";
+    else if (pesanLowercase.includes("@super")) aiPilihanBaru = "super";
+    else if (pesanLowercase.includes("@nano")) aiPilihanBaru = "nano";
+    else if (pesanLowercase.includes("@gambar")) aiPilihanBaru = "gambar";
+    else if (pesanLowercase.includes("@edit")) aiPilihanBaru = "edit";
+    else if (pesanLowercase.includes("@analisatugas")) aiPilihanBaru = "analisatugas";
+    else if (pesanLowercase.includes("@tugasumum")) aiPilihanBaru = "tugasumum";
 
+    // 2. Tentukan aiPilihan akhir
+    let aiPilihan = aiPilihanBaru || aiPilihanLama;
+
+    // 3. Jika tidak ada tag baru DAN tidak ada sesi lama di Redis, minta user panggil AI
     if (!aiPilihan) {
       await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: `@search berita terkini`, `@groq halo`, atau `@analisatugas` (kirim foto/pdf)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
 
-    // WAJIB SIMPAN SESI AKTIF KE REDIS SEBELUM DITERUSKAN KE BACKGROUND WORKER
-    await setRedis(`sesi_${chatId}`, aiPilihan);
-
-    context.waitUntil(prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase, fotoMasuk, dokumenMasuk));
-    return new Response(JSON.stringify({ status: 'queued_in_background' }), { status: 200 });
-  } catch (error) {
-    console.error('Main handler error:', error);
-    return new Response(JSON.stringify({ status: 'error' }), { status: 500 });
-  }
-}
+    // 4. Jika user berpindah ke AI baru, perbarui sesi di Redis detik ini juga
+    if (aiPilihanBaru && aiPilihanBaru !== aiPilihanLama) {
+      await setRedis(`sesi_${chatId}`, aiPilihanBaru);
+    } else if (!aiPilihanLama && aiPilihan) {
+      await setRedis(`sesi_${chatId}`, aiPilihan);
+    }
 
 // ================= FUNGSI PROSES DI LATAR BELAKANG (BACKGROUND WORKER) =================
 async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase, fotoMasuk, dokumenMasuk) {
