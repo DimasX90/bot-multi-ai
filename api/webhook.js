@@ -44,11 +44,15 @@ async function getRedis(key) {
     const data = await res.json();
     if (!data.result) return null;
 
-    try {
-      return JSON.parse(data.result);
-    } catch {
-      return data.result; // Mengembalikan string murni ("groq", "super", dll)
+    let parsed = data.result;
+    if (typeof parsed === 'string') {
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        // Tetap gunakan string murni jika bernilai "groq" atau "super"
+      }
     }
+    return parsed;
   } catch (e) {
     console.error("Redis Get Error:", e);
     return null;
@@ -308,7 +312,10 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "🧠 GPT-OSS 120B sedang menganalisis & berpikir...");
       
-      let riwayatGroq = await getRedis(`memori_groq_${chatId}`) || []; 
+      // Ambil riwayat dari Redis & Pastikan bentuknya WAJIB Array
+      let riwayatGroq = await getRedis(`memori_groq_${chatId}`);
+      if (!Array.isArray(riwayatGroq)) riwayatGroq = []; 
+      
       riwayatGroq.push({ role: "user", content: pertanyaanClean });
 
       try {
@@ -350,7 +357,10 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
       const pertanyaanClean = pesanUser.replace(/@super|\/super/gi, '').trim() || "Halo";
       await kirimPesanTelegram(chatId, "⚡ Mode Super Kilat (Qwen 3.8 27B) sedang memproses...");
       
-      let riwayatSuper = await getRedis(`memori_super_${chatId}`) || []; 
+      // Ambil riwayat dari Redis & Pastikan bentuknya WAJIB Array
+      let riwayatSuper = await getRedis(`memori_super_${chatId}`);
+      if (!Array.isArray(riwayatSuper)) riwayatSuper = [];
+      
       riwayatSuper.push({ role: "user", content: pertanyaanClean });
 
       try {
