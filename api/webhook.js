@@ -285,10 +285,12 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
     // [4] MODE GROQ
     else if (aiPilihan === "groq") {
       const pertanyaanClean = pesanUser.replace(/@groq|@grok/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ Groq sedang memproses jawaban...");
-      let riwayatChat = await getRedis(`memori_${chatId}`) || []; 
-      riwayatChat.push({ role: "user", content: pertanyaanClean });
+      await kirimPesanTelegram(chatId, "🧠 GPT-OSS 120B sedang menganalisis & berpikir...");
       
+      // Key Redis khusus untuk memori Groq
+      let riwayatGroq = await getRedis(`memori_groq_${chatId}`) || []; 
+      riwayatGroq.push({ role: "user", content: pertanyaanClean });
+
       try {
         const resGroq = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
           method: 'POST', 
@@ -297,35 +299,74 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
             'Authorization': `Bearer ${GROQ_API_KEY}` 
           }, 
           body: JSON.stringify({ 
-            model: "llama-3.3-70b-versatile", 
-            messages: riwayatChat.slice(-16) 
+            model: "openai/gpt-oss-120b", 
+            messages: riwayatGroq.slice(-8), // Menggunakan 8 pesan terakhir
+            temperature: 1,
+            max_completion_tokens: 2048,
+            top_p: 1,
+            reasoning_effort: "medium",
+            stream: false,
+            stop: null
           })
         });
         
         const groqData = await resGroq.json(); 
         const jawabanGroq = groqData.choices?.[0]?.message?.content;
-        
+
         if (jawabanGroq) { 
-          riwayatChat.push({ role: "assistant", content: jawabanGroq }); 
-          await setRedis(`memori_${chatId}`, riwayatChat.slice(-16)); 
-          await kirimPesanTelegram(chatId, `[Groq Llama-3.3]:\n\n${jawabanGroq}`);
+          riwayatGroq.push({ role: "assistant", content: jawabanGroq }); 
+          await setRedis(`memori_groq_${chatId}`, riwayatGroq.slice(-8)); // Simpan 8 pesan terakhir
+          await kirimPesanTelegram(chatId, `[Groq 🧠 via GPT-OSS 120B]:\n\n${jawabanGroq}`);
         } else {
-          const pesanErr = groqData.error?.message || "GROQ_API_KEY belum terpasang atau salah.";
-          await kirimPesanTelegram(chatId, `⚠️ Groq Gagal:\n\n${pesanErr}`);
+          const detailError = groqData.error?.message || "Gagal memproses via GPT-OSS 120B.";
+          await kirimPesanTelegram(chatId, `⚠️ Groq Gagal:\n\n${detailError}`);
         }
       } catch (err) {
-        await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan koneksi ke Groq.");
+        await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan koneksi ke Groq (GPT-OSS).");
       }
     }
     // [5] MODE SUPER (GROQ LLAMA 4 SCOUT)
     else if (aiPilihan === "super") {
-      const pertanyaanClean = pesanUser.replace(/@super/gi, '').trim() || "Halo";
-      await kirimPesanTelegram(chatId, "⏳ Llama Scout sedang merangkai jawaban kilat...");
-      let riwayatSuper = await getRedis(`memori_super_${chatId}`) || []; riwayatSuper.push({ role: "user", content: pertanyaanClean });
+      const pertanyaanClean = pesanUser.replace(/@super|\/super/gi, '').trim() || "Halo";
+      await kirimPesanTelegram(chatId, "⚡ Mode Super Kilat (Qwen 3.8 27B) sedang memproses...");
+      
+      // Key Redis khusus untuk memori Super
+      let riwayatSuper = await getRedis(`memori_super_${chatId}`) || []; 
+      riwayatSuper.push({ role: "user", content: pertanyaanClean });
+
       try {
-        const resSuper = await fetch("https://api.groq.com/openai/v1/chat/completions", { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` }, body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", messages: riwayatSuper.slice(-16) })});
-        const dataSuper = await resSuper.json(); if (resSuper.ok) { let jawabanSuper = dataSuper.choices?.[0]?.message?.content || "⚠️ Kosong."; riwayatSuper.push({ role: "assistant", content: jawabanSuper }); await setRedis(`memori_super_${chatId}`, riwayatSuper.slice(-16)); await kirimPesanTelegram(chatId, `[Llama 4 Scout ⚡ Groq]:\n\n${jawabanSuper}`); } else { await kirimPesanTelegram(chatId, `⚠️ Error API Groq`); }
-      } catch (err) { await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan."); }
+        const resSuper = await fetch("https://api.groq.com/openai/v1/chat/completions", { 
+          method: 'POST', 
+          headers: { 
+            'Content-Type': 'application/json', 
+            'Authorization': `Bearer ${GROQ_API_KEY}` 
+          }, 
+          body: JSON.stringify({ 
+            model: "qwen/qwen3.8-27b", 
+            messages: riwayatSuper.slice(-8), // Menggunakan 8 pesan terakhir
+            temperature: 0.6,
+            max_completion_tokens: 2048,
+            top_p: 0.95,
+            stream: false,
+            reasoning_effort: "default",
+            stop: null
+          })
+        });
+        
+        const superData = await resSuper.json(); 
+        const jawabanSuper = superData.choices?.[0]?.message?.content;
+        
+        if (jawabanSuper) { 
+          riwayatSuper.push({ role: "assistant", content: jawabanSuper }); 
+          await setRedis(`memori_super_${chatId}`, riwayatSuper.slice(-8)); // Simpan 8 pesan terakhir
+          await kirimPesanTelegram(chatId, `[Super Mode ⚡ via Qwen 3.8]:\n\n${jawabanSuper}`);
+        } else {
+          const detailError = superData.error?.message || "Gagal memproses via Qwen.";
+          await kirimPesanTelegram(chatId, `⚠️ Super Mode Gagal:\n\n${detailError}`);
+        }
+      } catch (err) {
+        await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan koneksi ke Groq (Qwen).");
+      }
     }
     // [6] MODE NVIDIA VISION
     else if (aiPilihan === "nano") {
