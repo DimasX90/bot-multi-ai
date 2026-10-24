@@ -150,20 +150,24 @@ export default async function handler(request, context) {
 
     // 🔥 LOGIKA PENGGANTIAN SALURAN OTOMATIS
     let aiPilihan = await getRedis(`sesi_${chatId}`);
-    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) { aiPilihan = "search"; await setRedis(`sesi_${chatId}`, aiPilihan); }
-    else if (pesanLowercase.includes("@gemini") || (fotoMasuk && pesanUser === "" && aiPilihan !== "edit")) { aiPilihan = "gemini"; await setRedis(`sesi_${chatId}`, aiPilihan); }
-    else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) { aiPilihan = "groq"; await setRedis(`sesi_${chatId}`, aiPilihan); }
-    else if (pesanLowercase.includes("@super")) { aiPilihan = "super"; await setRedis(`sesi_${chatId}`, aiPilihan); }
-    else if (pesanLowercase.includes("@nano")) { aiPilihan = "nano"; await setRedis(`sesi_${chatId}`, aiPilihan); }
-    else if (pesanLowercase.includes("@gambar")) { aiPilihan = "gambar"; await setRedis(`sesi_${chatId}`, aiPilihan); }
-    else if (pesanLowercase.includes("@edit")) { aiPilihan = "edit"; await setRedis(`sesi_${chatId}`, aiPilihan); }
-    else if (pesanLowercase.includes("@analisatugas")) { aiPilihan = "analisatugas"; await setRedis(`sesi_${chatId}`, aiPilihan); }
-    else if (pesanLowercase.includes("@tugasumum")) { aiPilihan = "tugasumum"; await setRedis(`sesi_${chatId}`, aiPilihan); }
+
+    if (pesanLowercase.includes("@search") || pesanLowercase.startsWith("/search")) aiPilihan = "search";
+    else if (pesanLowercase.includes("@gemini") || (fotoMasuk && pesanUser === "" && aiPilihan !== "edit")) aiPilihan = "gemini";
+    else if (pesanLowercase.includes("@groq") || pesanLowercase.includes("@grok")) aiPilihan = "groq";
+    else if (pesanLowercase.includes("@super")) aiPilihan = "super";
+    else if (pesanLowercase.includes("@nano")) aiPilihan = "nano";
+    else if (pesanLowercase.includes("@gambar")) aiPilihan = "gambar";
+    else if (pesanLowercase.includes("@edit")) aiPilihan = "edit";
+    else if (pesanLowercase.includes("@analisatugas")) aiPilihan = "analisatugas";
+    else if (pesanLowercase.includes("@tugasumum")) aiPilihan = "tugasumum";
 
     if (!aiPilihan) {
       await kirimPesanTelegram(chatId, "💡 Silakan panggil AI terlebih dahulu.\nContoh: `@search berita terkini`, `@groq halo`, atau `@analisatugas` (kirim foto/pdf)");
       return new Response(JSON.stringify({ status: 'ok' }), { status: 200 });
     }
+
+    // WAJIB SIMPAN SESI AKTIF KE REDIS SEBELUM DITERUSKAN KE BACKGROUND WORKER
+    await setRedis(`sesi_${chatId}`, aiPilihan);
 
     context.waitUntil(prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase, fotoMasuk, dokumenMasuk));
     return new Response(JSON.stringify({ status: 'queued_in_background' }), { status: 200 });
