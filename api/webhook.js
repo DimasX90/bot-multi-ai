@@ -175,7 +175,7 @@ export default async function handler(request, context) {
     console.error('Main handler error:', error);
     return new Response(JSON.stringify({ status: 'error' }), { status: 500 });
   }
-      }
+}
 
 // ================= FUNGSI PROSES DI LATAR BELAKANG (BACKGROUND WORKER) =================
 async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase, fotoMasuk, dokumenMasuk) {
