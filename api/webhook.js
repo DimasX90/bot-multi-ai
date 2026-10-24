@@ -240,37 +240,46 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
     else if (aiPilihan === "search") {
       const kueriPencarian = pesanUser.replace(/@search|\/search/gi, '').trim();
       if (!kueriPencarian) { 
-        await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian."); 
+        await kirimPesanTelegram(chatId, "🔍 Harap masukkan topik pencarian. Contoh: `@search berita terbaru hari ini`"); 
         return; 
       }
       
       await kirimPesanTelegram(chatId, "🌐 Sedang berselancar di internet via Tavily...");
       const hasilInternet = await cariDiInternet(kueriPencarian);
       
-      await kirimPesanTelegram(chatId, "🧠 Menyerahkan data riset ke Gemini untuk dirangkum...");
-      const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Jawab pertanyaan berikut secara terstruktur, objektif, dan ringkas menggunakan data internet yang disediakan. Di bagian paling bawah, tuliskan '📌 Sumber Referensi:' lalu daftarkan sumber link yang ada.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
+      await kirimPesanTelegram(chatId, "⚡ Menyerahkan data riset ke Groq (Qwen 3.8 27B) untuk dirangkum...");
+      const instruksiRangkum = "Kamu adalah Asisten Riset Pintar. Jawab pertanyaan pengguna secara terstruktur, objektif, dan ringkas berdasarkan data internet berikut. Di bagian paling bawah, WAJIB tuliskan '📌 Sumber Referensi:' lalu daftarkan semua judul website beserta URL/link yang ada dari data internet tersebut.\n\nPertanyaan: " + kueriPencarian + "\n\nData Internet:\n" + hasilInternet;
       
       try {
-        const resGeminiSearch = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + GEMINI_API_KEY, {
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ 
-            contents: [{ role: "user", parts: [{ text: instruksiRangkum }] }] 
+        const resGroqSearch = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: "qwen/qwen3.8-27b",
+            messages: [{ role: "user", content: instruksiRangkum }],
+            temperature: 0.6,
+            max_completion_tokens: 2048,
+            top_p: 0.95,
+            stream: false,
+            reasoning_effort: "default",
+            stop: null
           })
         });
         
-        const dataSearch = await resGeminiSearch.json();
-        const hasilRangkuman = dataSearch.candidates?.[0]?.content?.parts?.[0]?.text;
+        const dataSearch = await resGroqSearch.json();
+        const hasilRangkuman = dataSearch.choices?.[0]?.message?.content;
         
         if (hasilRangkuman) {
-          await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Gemini]:\n\n" + hasilRangkuman);
+          await kirimPesanTelegram(chatId, "[Perplexity Mode 🌐 via Groq Qwen-3.8]:\n\n" + hasilRangkuman);
         } else {
-          // Menampilkan pesan error asli dari Google API jika terjadi kegagalan
-          const pesanErrorGoogle = dataSearch.error?.message || "Format respon Gemini tidak valid.";
-          await kirimPesanTelegram(chatId, "⚠️ Gagal merangkum.\n\nDetail Error Google: " + pesanErrorGoogle);
+          const pesanErrorGroq = dataSearch.error?.message || "Format respon Groq tidak valid.";
+          await kirimPesanTelegram(chatId, "⚠️ Gagal merangkum via Groq.\n\nDetail Error: " + pesanErrorGroq);
         }
       } catch (err) {
-        await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan koneksi saat merangkum hasil penelusuran.");
+        await kirimPesanTelegram(chatId, "⚠️ Terjadi kesalahan koneksi ke Groq saat merangkum hasil penelusuran.");
       }
     }
     // [4] MODE GROQ
