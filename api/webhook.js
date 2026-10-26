@@ -248,18 +248,53 @@ async function prosesLatarBelakang(chatId, aiPilihan, pesanUser, pesanLowercase,
     else if (aiPilihan === "gemini") {
       let pertanyaanClean = pesanUser.replace(/@gemini/gi, '').trim() || "Tolong analisis.";
       pertanyaanClean += " (Berikan jawaban yang singkat, padat, langsung ke inti langkah pengerjaan/rumusnya saja).";
-      await kirimPesanTelegram(chatId, "⏳ Gemini sedang memproses jawaban...");
+      await kirimPesanTelegram(chatId, "⏳ Gemini 2.5 Flash sedang memproses jawaban...");
+      
       let memoriMentah = [];
-      if (base64Image) { await setRedis(`memori_gemini_${chatId}`, []); memoriMentah = []; } else { memoriMentah = await getRedis(`memori_gemini_${chatId}`) || []; }
+      if (base64Image) { 
+        await setRedis(`memori_gemini_${chatId}`, []); 
+        memoriMentah = []; 
+      } else { 
+        memoriMentah = await getRedis(`memori_gemini_${chatId}`);
+        // Validasi Wajib: Pastikan memori selalu bertipe Array agar tidak crash
+        if (!Array.isArray(memoriMentah)) memoriMentah = []; 
+      }
+
       let formatGemini = memoriMentah.map(msg => ({ role: msg.role, parts: [{ text: msg.content }] }));
       let partsSaatIni = [{ text: pertanyaanClean }];
       if (base64Image) partsSaatIni.push({ "inline_data": { "mime_type": "image/jpeg", "data": base64Image } });
       formatGemini.push({ role: "user", parts: partsSaatIni });
-      const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: formatGemini }) });
-      const resData = await resGemini.json();
-      let jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text || "⚠️ Respon tidak dikenali.";
-      if (!jawaban.startsWith("⚠️")) { memoriMentah.push({ role: "user", content: pertanyaanClean }); memoriMentah.push({ role: "model", content: jawaban }); await setRedis(`memori_gemini_${chatId}`, memoriMentah.slice(-16)); }
-      await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
+
+      try {
+        // Menggunakan endpoint resmi Gemini 2.5 Flash
+        const resGemini = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ contents: formatGemini }) 
+        });
+        
+        const resData = await resGemini.json();
+        let jawaban = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (jawaban) {
+          memoriMentah.push({ role: "user", content: pertanyaanClean }); 
+          memoriMentah.push({ role: "model", content: jawaban }); 
+          // Simpan 8 percakapan terakhir (16 pesan) ke Redis
+          await setRedis(`memori_gemini_${chatId}`, memoriMentah.slice(-16)); 
+          await kirimPesanTelegram(chatId, `[Gemini 2.5 Flash]:\n\n${jawaban}`);
+        } else {
+          // Tangkap dan tampilkan penyebab error asli langsung dari Google AI Studio
+          const detailErrorGoogle = resData.error 
+            ? `[Kode ${resData.error.code || 'API'}]: ${resData.error.message}` 
+            : (resData.candidates?.[0]?.finishReason 
+                ? `Diblokir Google Studio (Alasan: ${resData.candidates[0].finishReason})` 
+                : JSON.stringify(resData));
+
+          await kirimPesanTelegram(chatId, `⚠️ Google AI Studio Error:\n\n${detailErrorGoogle}`);
+        }
+      } catch (err) {
+        await kirimPesanTelegram(chatId, `⚠️ Kesalahan Koneksi Server:\n${err.message}`);
+      }
     }
     // [3] MODE PERPLEXITY (SEARCH TAVILY + GROQ QWEN 3.8 27B)
     else if (aiPilihan === "search") {
